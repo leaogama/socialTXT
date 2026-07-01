@@ -136,19 +136,24 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
         }],
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
+                'player_client': ['tv_simply', 'android', 'web'],
             }
         },
         'quiet': True,
         'no_warnings': True
     }
     
-    cookie_file = "cookies.txt"
+    # Busca cookies na pasta de dados persistente (/app/data/cookies.txt) ou na raiz (/app/cookies.txt)
+    data_dir = os.getenv("DATA_DIR", "/app/data")
+    cookie_file = os.path.join(data_dir, "cookies.txt")
     if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 150:
-        logs.append("Arquivo cookies.txt válido encontrado. Injetando cookies no yt-dlp...")
+        logs.append(f"Arquivo cookies.txt válido encontrado em {cookie_file}. Injetando cookies no yt-dlp...")
         ydl_opts['cookiefile'] = cookie_file
+    elif os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 150:
+        logs.append("Arquivo cookies.txt válido encontrado na raiz. Injetando cookies no yt-dlp...")
+        ydl_opts['cookiefile'] = "cookies.txt"
     else:
-        logs.append("Nenhum arquivo cookies.txt válido encontrado (usando requests sem cookies).")
+        logs.append("Nenhum arquivo cookies.txt válido encontrado em /app/data/cookies.txt ou na raiz (usando requests sem cookies).")
         
     try:
         logs.append("Iniciando download e processamento de áudio via yt-dlp...")
