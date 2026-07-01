@@ -12,7 +12,7 @@ echo =========================================
 echo Servidor reiniciado com sucesso!
 echo.
 echo A interface grafica esta disponivel em:
-echo http://localhost:8000
+echo http://localhost:8001
 echo =========================================
 echo.
 pause

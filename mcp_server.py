@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("SocialTXT")
 
 # URL base da API do SocialTXT (padrão é localhost, mas pode ser configurada via variável de ambiente)
-API_BASE_URL = os.getenv("SOCIALTXT_API_URL", "http://localhost:8000").rstrip("/")
+API_BASE_URL = os.getenv("SOCIALTXT_API_URL", "http://localhost:8001").rstrip("/")
 APP_USERNAME = os.getenv("APP_USERNAME", "")
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 

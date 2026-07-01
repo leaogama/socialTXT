@@ -8,8 +8,8 @@ services:
     container_name: mcp-social-summary
     restart: unless-stopped
     ports:
-      # Permite mudar a porta da VPS se a 8000 já estiver sendo usada (ex: APP_PORT=8080)
-      - "${APP_PORT:-8000}:8000"
+      # Permite mudar a porta da VPS se a 8001 já estiver sendo usada (ex: APP_PORT=8080)
+      - "${APP_PORT:-8001}:8000"
     environment:
       - APP_ENV=production
       - DATA_DIR=/app/data

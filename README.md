@@ -48,8 +48,8 @@ O **SocialTXT** é um microsserviço local e plataforma web para extração de t
     ```
 
 4.  **Acesse no seu navegador:**
-    *   **Interface Web:** [http://localhost:8000](http://localhost:8000)
-    *   **Documentação da API:** [http://localhost:8000/docs](http://localhost:8000/docs)
+    *   **Interface Web:** [http://localhost:8001](http://localhost:8001)
+    *   **Documentação da API:** [http://localhost:8001/docs](http://localhost:8001/docs)
 
 ---
 
@@ -59,7 +59,7 @@ O **SocialTXT** é um microsserviço local e plataforma web para extração de t
 O app expõe o endpoint `POST /api/summarize` para integração com automações (Make, n8n, scripts, etc.):
 
 ```bash
-curl -X POST "http://localhost:8000/api/summarize" \
+curl -X POST "http://localhost:8001/api/summarize" \
      -H "Content-Type: application/json" \
      -d '{
        "url": "https://youtube.com/shorts/vPhwZcuThsc",
