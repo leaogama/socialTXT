@@ -89,6 +89,35 @@ Adicione a configuração no arquivo `claude_desktop_config.json`:
 
 ---
 
+## 🧠 Arquitetura de IA & Casos de Uso (Ex: Integração com WhatsApp Bots)
+
+O SocialTXT funciona como um **pipeline de processamento de mídia** desacoplado:
+1. **Ingestão:** Captura o áudio/vídeo via Playwright e `yt-dlp`.
+2. **Transcrição local (Whisper):** Transcreve o áudio em texto corrido com pontuação inteligente.
+3. **Refinamento LLM (DeepSeek/OpenRouter):** Condensa o texto, extrai pontos chave e formata as respostas no padrão JSON.
+
+### Exemplo de Integração: Moderadores e Agentes de Vendas no WhatsApp
+
+Você pode conectar a API do SocialTXT ao seu bot de monitoramento de grupos de WhatsApp para criar automações inteligentes baseadas em mídias compartilhadas:
+
+#### 🛡️ Modo Moderador Automático
+Evite que vídeos com golpes, spam, links de afiliados de jogos de azar ou conteúdos nocivos inundem o grupo:
+* O bot captura a URL do Reels/TikTok/YouTube postada no chat.
+* Dispara uma chamada para o SocialTXT com um prompt crítico temporário (`prompt_override`):
+  *"Analise se o conteúdo deste vídeo promove fraudes financeiras, golpes, conteúdo adulto ou discursos de ódio. Retorne true ou false na chave 'proibido'."*
+* Se a API responder que é proibido, o bot deleta a mensagem do grupo imediatamente.
+
+#### 📈 Modo Vendas Contextual (Marketing de Atração)
+Aproveite os vídeos que as próprias pessoas enviam para ofertar seus produtos com base no assunto real do vídeo:
+* Um membro envia um vídeo sobre produtividade.
+* O bot chama o SocialTXT solicitando o resumo e instruindo o modelo a conectá-lo ao seu SaaS de gestão.
+* O bot envia uma mensagem natural: *"Muito legal esse vídeo que o @Membro compartilhou! O Ponto 2 abordado é sobre perda de foco, e o nosso software resolve exatamente isso. Quem quiser conhecer: [Link]"*.
+
+#### 📰 Daily Digest (Resumo Diário do Grupo)
+O bot coleta todos os links enviados no grupo durante o dia, solicita o resumo estruturado e, à noite, posta um boletim geral no grupo consolidando o melhor do dia de forma limpa e organizada.
+
+---
+
 ## 🐳 Implantação em VPS com Portainer
 
 O SocialTXT funciona no modelo GitOps através do Portainer.
