@@ -1,6 +1,9 @@
 # Segredos e Credenciais (CRÍTICO)
 .env
 cookies.txt
+settings.json
+data/
+*.log
 
 # Python
 __pycache__/

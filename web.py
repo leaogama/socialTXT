@@ -1,12 +1,15 @@
 import logging
+import secrets
+import os
 from typing import Literal, Dict, Any, Optional
 from pydantic import BaseModel
 import httpx
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from core import (
     validate_env,
@@ -21,6 +24,35 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 # Cria app FastAPI
 app = FastAPI(title="Social Summary API")
+
+# Configuração de Autenticação Básica (Opcional - Ativa se APP_USERNAME/PASSWORD estiverem definidos)
+security = HTTPBasic()
+APP_USERNAME = os.getenv("APP_USERNAME", "")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    if not APP_USERNAME or not APP_PASSWORD:
+        return ""
+    
+    current_username_bytes = credentials.username.encode("utf8")
+    correct_username_bytes = APP_USERNAME.encode("utf8")
+    is_correct_username = secrets.compare_digest(
+        current_username_bytes, correct_username_bytes
+    )
+    
+    current_password_bytes = credentials.password.encode("utf8")
+    correct_password_bytes = APP_PASSWORD.encode("utf8")
+    is_correct_password = secrets.compare_digest(
+        current_password_bytes, correct_password_bytes
+    )
+    
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Credenciais de acesso inválidas.",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # Permite chamadas do mesmo domínio
 app.add_middleware(
@@ -47,14 +79,32 @@ class SettingsModel(BaseModel):
     api_url: Optional[str] = ""
 
 @app.get("/api/settings")
-def get_settings():
-    return get_backend_settings()
+def get_settings(username: str = Depends(verify_credentials)):
+    settings = get_backend_settings()
+    raw_key = settings.get("api_key", "")
+    masked_key = ""
+    if raw_key:
+        if len(raw_key) > 8:
+            masked_key = f"{raw_key[:4]}...{raw_key[-4:]}"
+        else:
+            masked_key = "••••••••"
+    return {
+        "api_key": masked_key,
+        "model": settings.get("model", ""),
+        "api_url": settings.get("api_url", "")
+    }
 
 @app.post("/api/settings")
-def post_settings(settings: SettingsModel):
+def post_settings(settings: SettingsModel, username: str = Depends(verify_credentials)):
     try:
+        current = get_backend_settings()
+        new_key = settings.api_key
+        # Se vier mascarada do front (contendo ... ou •), mantém a chave atual
+        if new_key and ("..." in new_key or "•" in new_key or "·" in new_key):
+            new_key = current.get("api_key", "")
+        
         save_backend_settings({
-            "api_key": settings.api_key,
+            "api_key": new_key,
             "model": settings.model,
             "api_url": settings.api_url
         })
@@ -63,7 +113,7 @@ def post_settings(settings: SettingsModel):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/summarize")
-async def api_summarize(request: SummarizeRequest):
+async def api_summarize(request: SummarizeRequest, username: str = Depends(verify_credentials)):
     try:
         validate_env(request.api_key)
     except RuntimeError as e:
@@ -118,5 +168,5 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
-def read_root():
+def read_root(username: str = Depends(verify_credentials)):
     return FileResponse("static/index.html")

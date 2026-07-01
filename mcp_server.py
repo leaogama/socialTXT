@@ -7,6 +7,8 @@ mcp = FastMCP("SocialTXT")
 
 # URL base da API do SocialTXT (padrão é localhost, mas pode ser configurada via variável de ambiente)
 API_BASE_URL = os.getenv("SOCIALTXT_API_URL", "http://localhost:8000").rstrip("/")
+APP_USERNAME = os.getenv("APP_USERNAME", "")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 
 @mcp.tool()
 async def summarize_social_url(
@@ -31,9 +33,11 @@ async def summarize_social_url(
         "language": language
     }
     
+    auth = (APP_USERNAME, APP_PASSWORD) if APP_USERNAME and APP_PASSWORD else None
+    
     try:
         async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(api_url, json=payload)
+            response = await client.post(api_url, json=payload, auth=auth)
             
             if response.status_code != 200:
                 return f"Erro na API ({response.status_code}): {response.text}"

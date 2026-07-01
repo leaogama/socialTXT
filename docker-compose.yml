@@ -12,6 +12,9 @@ services:
     environment:
       - APP_ENV=production
       - DATA_DIR=/app/data
+      # Variáveis de autenticação básica para proteger o app (deixe em branco para desativar)
+      - APP_USERNAME=${APP_USERNAME:-}
+      - APP_PASSWORD=${APP_PASSWORD:-}
       # Variáveis opcionais se preferir configurar direto no Portainer em vez da interface do app:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
