@@ -2,16 +2,24 @@ version: '3.8'
 
 services:
   mcp-social-summary:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: mcp-social-summary
     restart: unless-stopped
-    # Reconhece variáveis tanto do arquivo .env (local) quanto do Portainer UI (VPS)
-    environment:
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-deepseek/deepseek-chat-v3-0324}
-      - LLM_API_URL=${LLM_API_URL:-https://openrouter.ai/api/v1/chat/completions}
-    # Caso queira usar cookies para o Instagram, crie o arquivo cookies.txt na VPS e descomente abaixo:
-    # volumes:
-    #   - ./cookies.txt:/app/cookies.txt:ro
     ports:
       - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DATA_DIR=/app/data
+      # Variáveis opcionais se preferir configurar direto no Portainer em vez da interface do app:
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_API_URL=${LLM_API_URL:-}
+    volumes:
+      - socialtxt_data:/app/data
+      # Caso precise de cookies para o Instagram, descomente abaixo:
+      # - ./cookies.txt:/app/cookies.txt:ro
+
+volumes:
+  socialtxt_data:

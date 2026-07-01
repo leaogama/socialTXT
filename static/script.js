@@ -72,15 +72,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let editingIndex = null; // null = criando novo, 'default' = editando padrão, número = editando custom
 
     // ===== CARREGAR CONFIGURAÇÕES =====
-    const loadSettings = () => {
-        // Credenciais IA
-        const savedProvider = localStorage.getItem('socialTxt_apiProvider');
-        const savedKey = localStorage.getItem('socialTxt_apiKey');
-        const savedModel = localStorage.getItem('socialTxt_model');
+    const loadSettings = async () => {
+        // Tentar carregar credenciais do backend primeiro
+        try {
+            const resp = await fetch('/api/settings');
+            if (resp.ok) {
+                const settings = await resp.json();
+                if (settings.api_key) apiKeyInput.value = settings.api_key;
+                if (settings.api_url) apiProviderSelect.value = settings.api_url;
+                if (settings.model) modelInput.value = settings.model;
+            }
+        } catch (e) {
+            console.warn("Não foi possível carregar configurações do backend, usando localStorage como fallback.", e);
+            // Fallback para localStorage
+            const savedProvider = localStorage.getItem('socialTxt_apiProvider');
+            const savedKey = localStorage.getItem('socialTxt_apiKey');
+            const savedModel = localStorage.getItem('socialTxt_model');
 
-        if (savedProvider) apiProviderSelect.value = savedProvider;
-        if (savedKey) apiKeyInput.value = savedKey;
-        if (savedModel) modelInput.value = savedModel;
+            if (savedProvider) apiProviderSelect.value = savedProvider;
+            if (savedKey) apiKeyInput.value = savedKey;
+            if (savedModel) modelInput.value = savedModel;
+        }
 
         // Custom Prompts
         const savedPrompts = localStorage.getItem('socialTxt_customPrompts_v2');
@@ -491,14 +503,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ===== CREDENCIAIS IA =====
-    saveSettingsBtn.addEventListener('click', () => {
-        localStorage.setItem('socialTxt_apiProvider', apiProviderSelect.value);
-        localStorage.setItem('socialTxt_apiKey', apiKeyInput.value);
-        localStorage.setItem('socialTxt_model', modelInput.value);
-        
-        const originalText = saveSettingsBtn.textContent;
-        saveSettingsBtn.textContent = '✅ Salvo!';
-        setTimeout(() => saveSettingsBtn.textContent = originalText, 2000);
+    saveSettingsBtn.addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const apiUrl = apiProviderSelect.value.trim();
+        const model = modelInput.value.trim();
+
+        // Salvar localmente no localStorage para redundância/cache
+        localStorage.setItem('socialTxt_apiProvider', apiUrl);
+        localStorage.setItem('socialTxt_apiKey', apiKey);
+        localStorage.setItem('socialTxt_model', model);
+
+        // Salvar persistentemente no backend
+        try {
+            const resp = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    api_url: apiUrl,
+                    model: model
+                })
+            });
+            if (!resp.ok) throw new Error("Erro ao salvar no backend");
+
+            const originalText = saveSettingsBtn.textContent;
+            saveSettingsBtn.textContent = '✅ Salvo!';
+            setTimeout(() => saveSettingsBtn.textContent = originalText, 2000);
+        } catch (e) {
+            console.error("Erro ao salvar credenciais no backend:", e);
+            alert('Aviso: As configurações foram salvas localmente no navegador, mas falhou ao salvar de forma persistente no servidor: ' + e.message);
+        }
     });
 
     // ===== BUSCAR MODELOS =====

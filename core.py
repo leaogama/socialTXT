@@ -21,9 +21,35 @@ LLM_MODEL = os.getenv(
     "deepseek/deepseek-chat-v3-0324"
 )
 
+DATA_DIR = os.getenv("DATA_DIR", "data")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+
+def get_backend_settings() -> Dict[str, Any]:
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            logging.exception("Erro ao ler arquivo de configurações backend.")
+    return {}
+
+def save_backend_settings(settings: Dict[str, Any]) -> None:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+    except Exception:
+        logging.exception("Erro ao salvar arquivo de configurações backend.")
+
 def validate_env(api_key_override: str = None) -> None:
-    if not api_key_override and not LLM_API_KEY:
-        raise RuntimeError("Faltou configurar a chave de API da IA. Informe no painel de Configurações.")
+    if api_key_override:
+        return
+    settings = get_backend_settings()
+    if settings.get("api_key"):
+        return
+    if LLM_API_KEY:
+        return
+    raise RuntimeError("Faltou configurar a chave de API da IA. Informe no painel de Configurações.")
 
 async def get_transcript_text(url: str) -> str:
     """Roda a extração que é bloqueante (CPU/IO) de forma assíncrona usando threads"""
@@ -41,9 +67,10 @@ async def summarize_with_llm(
     include_json_requirement: bool = True
 ) -> Dict[str, Any]:
     
-    final_api_key = api_key_override or LLM_API_KEY
-    final_model = model_override or LLM_MODEL
-    final_api_url = api_url_override or LLM_API_URL
+    settings = get_backend_settings()
+    final_api_key = api_key_override or settings.get("api_key") or LLM_API_KEY
+    final_model = model_override or settings.get("model") or LLM_MODEL
+    final_api_url = api_url_override or settings.get("api_url") or LLM_API_URL
     
     base_prompt = prompt_override.strip() if prompt_override else (
         "Você é um analisador de conteúdo de redes sociais. "

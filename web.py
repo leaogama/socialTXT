@@ -8,7 +8,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from core import validate_env, get_transcript_text, summarize_with_llm
+from core import (
+    validate_env,
+    get_transcript_text,
+    summarize_with_llm,
+    get_backend_settings,
+    save_backend_settings
+)
 
 # Configura logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -34,6 +40,27 @@ class SummarizeRequest(BaseModel):
     api_url: Optional[str] = None
     prompt_override: Optional[str] = None
     include_json_requirement: Optional[bool] = True
+
+class SettingsModel(BaseModel):
+    api_key: Optional[str] = ""
+    model: Optional[str] = ""
+    api_url: Optional[str] = ""
+
+@app.get("/api/settings")
+def get_settings():
+    return get_backend_settings()
+
+@app.post("/api/settings")
+def post_settings(settings: SettingsModel):
+    try:
+        save_backend_settings({
+            "api_key": settings.api_key,
+            "model": settings.model,
+            "api_url": settings.api_url
+        })
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/summarize")
 async def api_summarize(request: SummarizeRequest):
