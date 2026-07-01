@@ -48,6 +48,11 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str) -> tuple[bool
             'preferredcodec': 'mp3',
             'preferredquality': '128',
         }],
+        'extractor_args': {
+            'youtube': {
+                'player_client': 'android,web',
+            }
+        },
         'quiet': True,
         'no_warnings': True
     }
