@@ -1,0 +1,28 @@
+# Segredos e Credenciais (CRÍTICO)
+.env
+cookies.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Docker local temp files
+.docker/
+
+# Sistemas Operacionais e IDEs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

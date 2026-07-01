@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocialTXT — Resumo Inteligente de Redes Sociais</title>
+    <meta name="description" content="Cole o link de um vídeo do YouTube, TikTok, Reels ou X e receba um resumo instantâneo com IA.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- JSON-LD para agentes de IA interpretarem a API automaticamente -->
+    <script type="application/ld+json" id="ai-instructions-schema">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebAPI",
+      "name": "SocialTXT API",
+      "description": "API REST local para extrair e resumir conteúdos do YouTube, TikTok, Reels e postagens do X.",
+      "documentation": "http://localhost:8000/docs",
+      "endpoint": "http://localhost:8000/api/summarize",
+      "httpMethod": "POST",
+      "encodingType": "application/json",
+      "openapi": "http://localhost:8000/openapi.json"
+    }
+    </script>
+</head>
+<body>
+    <!-- Elementos de fundo dinâmicos -->
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Overlay da sidebar no mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <main class="app-layout">
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>⚙️ Configurações</h2>
+                <button class="icon-btn sidebar-toggle-close" id="closeSidebar" title="Fechar painel">✕</button>
+            </div>
+
+            <!-- Seção: Provedor de IA -->
+            <details class="config-section" open>
+                <summary>🤖 Provedor de IA</summary>
+                <div class="config-body">
+                    <label class="label-with-help">
+                        <span>API: <span class="help-trigger" title="Selecione o provedor de inteligência artificial. DeepSeek e OpenRouter são altamente recomendados.">?</span></span>
+                        <select id="api-provider-select">
+                            <option value="https://api.deepseek.com/v1/chat/completions">DeepSeek</option>
+                            <option value="https://openrouter.ai/api/v1/chat/completions">OpenRouter</option>
+                            <option value="https://api.openai.com/v1/chat/completions">OpenAI</option>
+                        </select>
+                    </label>
+                    <label class="label-with-help">
+                        <span>Chave (API Key): <span class="help-trigger" title="Sua chave secreta do provedor selecionado. Ela fica salva apenas localmente no seu navegador.">?</span></span>
+                        <input type="password" id="api-key-input" placeholder="sk-...">
+                    </label>
+                    <label class="label-with-help">
+                        <span>Modelo: <span class="help-trigger" title="Nome exato do modelo. Use o botão 🔄 para buscar a lista de modelos ativos da sua conta.">?</span></span>
+                        <div class="inline-row">
+                            <input type="text" id="model-input" placeholder="deepseek-chat" list="model-datalist">
+                            <datalist id="model-datalist"></datalist>
+                            <button type="button" id="fetch-models-btn" class="small-btn" title="Buscar modelos na API">🔄</button>
+                        </div>
+                    </label>
+                    <button id="save-settings-btn" class="accent-btn full-width">💾 Salvar Credenciais</button>
+                </div>
+            </details>
+
+            <!-- Seção: Diretrizes (Gerenciador de Prompts) -->
+            <details class="config-section" open>
+                <summary>📋 Gerenciador de Diretrizes</summary>
+                <div class="config-body">
+                    <!-- Ações de Lote -->
+                    <div class="prompt-toolbar">
+                        <button type="button" id="createNewPromptBtn" class="small-btn" title="Criar nova diretriz baseada no padrão">➕ Novo</button>
+                        <button type="button" id="exportPromptsBtn" class="small-btn" title="Exportar diretrizes salvas para arquivo">📤 Exportar</button>
+                        <button type="button" id="importPromptsBtn" class="small-btn" title="Importar diretrizes de arquivo JSON">📥 Importar</button>
+                        <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                    </div>
+
+                    <!-- Lista de Prompts (Suporta Drag and Drop) -->
+                    <div class="prompt-list" id="promptListContainer">
+                        <!-- Gerado via JavaScript -->
+                    </div>
+
+                    <!-- Editor de Prompt (Exibido ao Criar/Editar) -->
+                    <div class="prompt-editor-card hidden" id="promptEditorCard">
+                        <h4 id="editorTitle">✏️ Criar Diretriz</h4>
+                        <label>
+                            Nome da Diretriz:
+                            <input type="text" id="editorPromptName" placeholder="Ex: Caçador de Marcas">
+                        </label>
+                        <label>
+                            Instruções do Sistema:
+                            <textarea id="editorPromptText" rows="4" placeholder="Escreva as instruções detalhadas aqui..."></textarea>
+                        </label>
+                        <label class="toggle-container">
+                            <input type="checkbox" id="editorIncludeJson" checked>
+                            <span class="toggle-slider"></span>
+                            <span>Forçar saída em formato JSON estruturado <span class="help-trigger" title="Ative para que a IA preencha perfeitamente os blocos da GUI (Resumo, Pontos Principais, Título, etc). Desative caso queira uma resposta em texto puro.">?</span></span>
+                        </label>
+                        <div class="editor-buttons">
+                            <button type="button" id="cancelEditorBtn" class="small-btn">Cancelar</button>
+                            <button type="button" id="saveEditorBtn" class="accent-btn">Confirmar</button>
+                        </div>
+                    </div>
+
+                    <!-- Visualização em Tempo Real (Live Preview) -->
+                    <div class="live-preview-box">
+                        <div class="live-preview-header">
+                            <span>🔍 System Prompt Final</span>
+                            <button type="button" id="togglePreviewTextBtn" class="link-btn">Ver texto</button>
+                        </div>
+                        <div class="live-preview-content collapsed" id="livePreviewContainer">
+                            <pre><code id="livePreviewText">Carregando...</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </aside>
+
+        <!-- ===== CONTEÚDO PRINCIPAL ===== -->
+        <div class="main-content" id="mainContent">
+            <header>
+                <div class="header-top">
+                    <button class="icon-btn sidebar-toggle" id="openSidebar" title="Abrir configurações">⚙️</button>
+                    <h1>Social<span>TXT</span></h1>
+                </div>
+                <p>Cole o link de um vídeo do YouTube, TikTok, Reels ou X e receba um resumo estruturado.</p>
+            </header>
+
+            <form id="summary-form" class="glass-panel">
+                <div class="input-group">
+                    <input type="url" id="url-input" placeholder="https://www.instagram.com/reel/..." required>
+                    <button type="submit" id="submit-btn">
+                        <span class="btn-text">Resumir</span>
+                        <span class="loader hidden"></span>
+                    </button>
+                </div>
+                <div class="options-bar">
+                    <label>
+                        Detalhe:
+                        <select id="detailLevel">
+                            <option value="curto">Curto</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="detalhado">Detalhado</option>
+                        </select>
+                    </label>
+                    <label>
+                        Idioma:
+                        <select id="language">
+                            <option value="pt-br" selected>Português (BR)</option>
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </label>
+                    <span class="active-prompt-badge" id="activePromptBadge" title="Diretriz ativa">📋 Padrão</span>
+                </div>
+            </form>
+
+            <section id="result-section" class="glass-panel hidden">
+                <div class="result-header">
+                    <span id="content-type-badge" class="badge">Vídeo</span>
+                    <h2 id="result-title">Título sugerido</h2>
+                </div>
+
+                <div id="warnings-container" class="warnings hidden"></div>
+
+                <!-- Bloco de Resposta Estruturada (Exibido quando a resposta é JSON) -->
+                <div id="structured-result-block">
+                    <div class="summary-block">
+                        <h3>Resumo Geral</h3>
+                        <p id="summary-text">...</p>
+                    </div>
+
+                    <div class="points-block">
+                        <h3>Pontos Principais</h3>
+                        <ul id="key-points-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Bloco de Texto Puro (Exibido caso JSON esteja desativado) -->
+                <div id="plain-text-result-block" class="hidden">
+                    <h3>Resposta da IA</h3>
+                    <div id="plain-text-content" class="prompt-text plain-output-style"></div>
+                </div>
+
+                <button id="reset-btn" class="secondary-btn">Resumir outro link</button>
+            </section>
+
+            <!-- ===== SEÇÃO API & DESENVOLVEDOR (Pessoas e IAs) ===== -->
+            <section class="glass-panel api-info-panel" id="ai-api-instructions">
+                <div class="api-info-header">
+                    <h3>🔌 Integração & Desenvolvedores</h3>
+                    <div class="api-tabs">
+                        <button type="button" class="tab-btn active" id="tab-rest-btn">REST API</button>
+                        <button type="button" class="tab-btn" id="tab-mcp-btn">MCP Server</button>
+                    </div>
+                </div>
+
+                <!-- Painel REST -->
+                <div class="tab-content" id="content-rest">
+                    <p class="api-intro">
+                        Este aplicativo funciona localmente como um microsserviço. Você ou qualquer agente/IA pode consumir o serviço de resumo diretamente via requisições HTTP REST.
+                    </p>
+                    <div class="api-details">
+                        <div class="api-endpoint">
+                            <span class="method post-method">POST</span>
+                            <code class="endpoint-url">/api/summarize</code>
+                        </div>
+                        <p class="api-docs-link-text">
+                            Documentação técnica completa e OpenAPI Schema (Swagger):<br>
+                            👉 Link interativo: <a href="/docs" target="_blank">http://localhost:8000/docs</a><br>
+                            👉 Schema JSON da OpenAPI (para IAs): <a href="/openapi.json" target="_blank">http://localhost:8000/openapi.json</a>
+                        </p>
+                        <details class="api-schema-details">
+                            <summary>Visualizar exemplo de payload (JSON)</summary>
+                            <pre><code>{
+  "url": "https://www.instagram.com/reel/...",
+  "detail": "normal",
+  "language": "pt-br",
+  "prompt_override": "instrução customizada opcional",
+  "include_json_requirement": true
+}</code></pre>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Painel MCP -->
+                <div class="tab-content hidden" id="content-mcp">
+                    <p class="api-intro">
+                        O SocialTXT implementa a especificação <strong>Model Context Protocol (MCP)</strong>. Conecte-o diretamente como uma ferramenta nativa ao Claude Desktop, Cursor ou qualquer cliente compatível.
+                    </p>
+                    <div class="api-details">
+                        <p class="api-docs-link-text">
+                            <strong>Passo 1:</strong> Adicione esta configuração ao seu arquivo de configuração MCP.<br>
+                            No Windows (Claude Desktop): <code>%APPDATA%\Claude\claude_desktop_config.json</code>
+                        </p>
+                        <div class="code-container-mcp">
+                            <pre><code>{
+  "mcpServers": {
+    "socialtxt": {
+      "command": "python",
+      "args": ["C:/_git/socialTXT/mcp_server.py"],
+      "env": {
+        "LLM_API_KEY": "SUA_API_KEY_AQUI"
+      }
+    }
+  }
+}</code></pre>
+                        </div>
+                        <p class="api-docs-link-text" style="margin-top: 1rem;">
+                            <strong>Passo 2:</strong> Certifique-se de que a biblioteca oficial do MCP está instalada no seu Python local:<br>
+                            <code>pip install mcp</code>
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
