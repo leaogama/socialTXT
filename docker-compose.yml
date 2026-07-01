@@ -8,12 +8,13 @@ services:
     container_name: mcp-social-summary
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      # Permite mudar a porta da VPS se a 8000 já estiver sendo usada (ex: APP_PORT=8080)
+      - "${APP_PORT:-8000}:8000"
     environment:
       - APP_ENV=production
       - DATA_DIR=/app/data
       # Insira usuário e senha aqui no Portainer para bloquear o acesso público à web e à API
-      - APP_USERNAME=leaogama
+      - APP_USERNAME=${APP_USERNAME:-}
       - APP_PASSWORD=${APP_PASSWORD:-}
       
       - LLM_API_KEY=${LLM_API_KEY:-}
