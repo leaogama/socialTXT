@@ -121,16 +121,21 @@ async def api_summarize(request: SummarizeRequest, username: str = Depends(verif
 
     try:
         logging.info("Recebendo URL via Web API: %s", request.url)
-        transcript_text = await get_transcript_text(request.url)
+        transcript_text, debug_logs = await get_transcript_text(request.url)
 
         if not transcript_text:
+            warnings = ["Não foi possível extrair texto/transcrição desta URL."]
+            if debug_logs:
+                warnings.append("--- DETALHES DO PIPELINE DE EXTRAÇÃO (DEBUG) ---")
+                for log in debug_logs:
+                    warnings.append(f"• {log}")
             return {
                 "url": request.url,
                 "summary": "",
                 "key_points": [],
                 "possible_title": "",
                 "content_type": "outro",
-                "warnings": ["Não foi possível extrair texto/transcrição desta URL."]
+                "warnings": warnings
             }
 
         summary = await summarize_with_llm(

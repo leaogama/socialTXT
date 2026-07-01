@@ -51,7 +51,7 @@ def validate_env(api_key_override: str = None) -> None:
         return
     raise RuntimeError("Faltou configurar a chave de API da IA. Informe no painel de Configurações.")
 
-async def get_transcript_text(url: str) -> str:
+async def get_transcript_text(url: str) -> tuple[str, list[str]]:
     """Roda a extração que é bloqueante (CPU/IO) de forma assíncrona usando threads"""
     return await asyncio.to_thread(extract_social_content, url)
 

@@ -26,19 +26,21 @@ def extract_youtube_id(url: str) -> str:
     match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
     return match.group(1) if match else ""
 
-def try_youtube_transcript_api(url: str) -> str:
+def try_youtube_transcript_api(url: str, logs: list) -> str:
     video_id = extract_youtube_id(url)
     if not video_id:
+        logs.append("Falha ao extrair ID do vídeo a partir da URL do YouTube.")
         return ""
     try:
-        logging.info("Tentando youtube-transcript-api...")
+        logs.append("Tentando extrair transcrição nativa via youtube-transcript-api...")
         transcript_list = YouTubeTranscriptApi().fetch(video_id, languages=['pt', 'en', 'es'])
+        logs.append("Sucesso! Transcrição obtida de forma nativa do YouTube.")
         return " ".join([t['text'] for t in transcript_list])
     except Exception as e:
-        logging.warning("youtube-transcript-api falhou: %s", e)
+        logs.append(f"youtube-transcript-api falhou: {str(e)}")
         return ""
 
-def download_media_and_metadata_yt_dlp(url: str, output_base: str) -> tuple[bool, str]:
+def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -> tuple[bool, str]:
     # Baixa apenas áudio e tenta extrair a legenda (descrição)
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -57,25 +59,29 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str) -> tuple[bool
         'no_warnings': True
     }
     
-    # Injetando cookies se o arquivo existir e não for vazio
     cookie_file = "cookies.txt"
     if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 150:
-        logging.info("Arquivo cookies.txt válido encontrado. Injetando no yt-dlp...")
+        logs.append("Arquivo cookies.txt válido encontrado. Injetando cookies no yt-dlp...")
         ydl_opts['cookiefile'] = cookie_file
-
+    else:
+        logs.append("Nenhum arquivo cookies.txt válido encontrado (usando requests sem cookies).")
+        
     try:
+        logs.append("Iniciando download e processamento de áudio via yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             description = info.get('description', '')
+            logs.append("Download do áudio via yt-dlp concluído com sucesso.")
             return True, description
     except Exception as e:
-        logging.error("yt-dlp falhou: %s", e)
+        logs.append(f"yt-dlp falhou ao extrair áudio: {str(e)}")
         return False, ""
 
-def extract_with_playwright(url: str, output_base: str) -> tuple[bool, str]:
+def extract_with_playwright(url: str, output_base: str, logs: list) -> tuple[bool, str]:
     """Usa o Playwright (navegador real headless) para contornar bloqueios do Instagram e X"""
     description = ""
     try:
+        logs.append("Iniciando Playwright (Chromium headless)...")
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
@@ -84,7 +90,7 @@ def extract_with_playwright(url: str, output_base: str) -> tuple[bool, str]:
                     '--no-sandbox',
                     '--disable-setuid-sandbox'
                 ]
-            )
+              )
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
@@ -108,16 +114,18 @@ def extract_with_playwright(url: str, output_base: str) -> tuple[bool, str]:
 
             page.on("response", handle_response)
             
-            logging.info("Playwright acessando a página: %s", url)
+            logs.append(f"Playwright navegando até a URL: {url}")
             page.goto(url, wait_until="networkidle", timeout=20000)
             
             # Tenta extrair legenda (og:description, etc)
             desc_element = page.locator('meta[property="og:description"]')
             if desc_element.count() > 0:
                 description = desc_element.get_attribute("content") or ""
+                logs.append(f"Legenda meta:og:description capturada com sucesso ({len(description)} chars).")
                 
             # Busca ativamente vídeos no html como fallback extra
             videos = page.locator('video')
+            logs.append(f"Tags de vídeo encontradas na página: {videos.count()}")
             for i in range(videos.count()):
                 src = videos.nth(i).get_attribute("src")
                 if src and not src.startswith("blob:"):
@@ -126,12 +134,13 @@ def extract_with_playwright(url: str, output_base: str) -> tuple[bool, str]:
                     src = re.sub(r'&byteend=\d+', '', src)
                     captured_media_urls.add(src)
 
+            logs.append(f"Total de links de mídia capturados pelo Playwright: {len(captured_media_urls)}")
             # Tenta baixar as mídias capturadas e checa qual tem áudio
             import av
             success = False
             for media_url in captured_media_urls:
                 try:
-                    logging.info("Verificando mídia interceptada: %s...", media_url[:80])
+                    logs.append(f"Verificando integridade da mídia interceptada: {media_url[:80]}...")
                     resp = httpx.get(media_url, follow_redirects=True, timeout=15.0)
                     resp.raise_for_status()
                     
@@ -146,49 +155,53 @@ def extract_with_playwright(url: str, output_base: str) -> tuple[bool, str]:
                             if len(container.streams.audio) > 0:
                                 has_audio = True
                     except Exception as e:
-                        pass
+                        logs.append(f"AV container erro: {str(e)}")
                         
                     if has_audio:
-                        logging.info("Mídia válida com áudio encontrada!")
+                        logs.append("Mídia válida com faixa de áudio encontrada!")
                         os.rename(tmp_file, f"{output_base}.mp4")
                         success = True
                         break
                     else:
+                        logs.append("Mídia não possui faixa de áudio. Excluindo temporário...")
                         os.remove(tmp_file)
                 except Exception as e:
-                    logging.warning("Falha ao baixar/verificar media: %s", e)
+                    logs.append(f"Falha ao baixar/verificar media: {str(e)}")
 
+            browser.close()
             if success:
-                browser.close()
                 return True, description
             else:
-                logging.warning("Playwright não encontrou nenhuma mídia com áudio.")
-                browser.close()
+                logs.append("Playwright não encontrou nenhuma mídia de áudio válida para download.")
                 return False, description
                 
     except Exception as e:
-        logging.error("Erro no Playwright: %s", e)
+        logs.append(f"Erro geral no fluxo do Playwright: {str(e)}")
         return False, description
 
-def transcribe_audio(file_path: str) -> str:
+def transcribe_audio(file_path: str, logs: list) -> str:
     try:
+        logs.append("Carregando modelo Whisper para transcrição...")
         model = get_whisper_model()
-        logging.info(f"Iniciando transcrição com Whisper para o arquivo {file_path}...")
+        logs.append(f"Whisper carregado com sucesso. Transcrevendo {file_path}...")
         segments, _ = model.transcribe(file_path, beam_size=5)
         text = " ".join([segment.text for segment in segments])
+        logs.append(f"Transcrição concluída com sucesso ({len(text)} caracteres).")
         return text.strip()
     except Exception as e:
-        logging.error("Erro ao transcrever áudio (talvez mídia corrompida): %s", e)
+        logs.append(f"Erro ao transcrever áudio com Whisper: {str(e)}")
         return ""
 
-def extract_social_content(url: str) -> str:
+def extract_social_content(url: str) -> tuple[str, list[str]]:
+    debug_logs = []
     result_text = ""
     
     # 1. Tentar nativo do YouTube primeiro
     if "youtube.com" in url or "youtu.be" in url:
-        text = try_youtube_transcript_api(url)
+        debug_logs.append("Detectada URL do YouTube. Iniciando métodos de extração...")
+        text = try_youtube_transcript_api(url, debug_logs)
         if text:
-            return f"Transcrição do YouTube: {text}"
+            return f"Transcrição do YouTube: {text}", debug_logs
 
     temp_id = str(uuid.uuid4())
     base_path = f"/tmp/{temp_id}"
@@ -198,13 +211,13 @@ def extract_social_content(url: str) -> str:
 
     # 2. Instagram: tenta Playwright primeiro (navegador real)
     if "instagram.com" in url:
-        logging.info("Iniciando Playwright para burlar bloqueio do Instagram...")
-        success, description = extract_with_playwright(url, base_path)
+        debug_logs.append("Detectada URL do Instagram. Iniciando fluxo com Playwright...")
+        success, description = extract_with_playwright(url, base_path, debug_logs)
     
     # 3. Fallback: Baixar áudio + Descrição com yt-dlp (com suporte a cookies opcional)
     if not success:
-        logging.info("Iniciando yt-dlp para tentar extrair mídia...")
-        success, description = download_media_and_metadata_yt_dlp(url, base_path)
+        debug_logs.append("Iniciando extração via download com yt-dlp + transcrição Whisper...")
+        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs)
     
     if description:
         result_text += f"Legenda/Descrição original:\n{description}\n\n"
@@ -212,14 +225,16 @@ def extract_social_content(url: str) -> str:
     if success:
         # Encontra o arquivo de mídia gerado (.mp4, .mp3, .m4a, etc) e transcreve
         files = glob.glob(f"{base_path}*")
+        debug_logs.append(f"Arquivos de áudio prontos para transcrição local: {files}")
         for f in files:
-            transcription = transcribe_audio(f)
+            transcription = transcribe_audio(f, debug_logs)
             if transcription:
                 result_text += f"Transcrição do áudio:\n{transcription}"
             # Limpeza
             try:
                 os.remove(f)
-            except OSError:
-                pass
+                debug_logs.append(f"Limpeza concluída. Arquivo removido: {f}")
+            except OSError as e:
+                debug_logs.append(f"Erro ao remover arquivo temporário {f}: {str(e)}")
 
-    return result_text.strip()
+    return result_text.strip(), debug_logs
