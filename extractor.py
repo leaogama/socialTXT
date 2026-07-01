@@ -26,6 +26,82 @@ def extract_youtube_id(url: str) -> str:
     match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
     return match.group(1) if match else ""
 
+def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
+    logs.append("Tentando obter transcrição do YouTube via Playwright (bypassing datacenter IP block)...")
+    try:
+        import html
+        import xml.etree.ElementTree as ET
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox'
+                ]
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+            logs.append("Playwright acessando página do YouTube...")
+            page.goto(url, wait_until="networkidle", timeout=25000)
+            
+            player_response = page.evaluate("() => window.ytInitialPlayerResponse")
+            browser.close()
+            
+            if not player_response:
+                logs.append("Objeto ytInitialPlayerResponse não encontrado no DOM do YouTube.")
+                return ""
+                
+            captions = player_response.get("captions", {})
+            tracklist = captions.get("playerCaptionsTracklistRenderer", {})
+            caption_tracks = tracklist.get("captionTracks", [])
+            
+            if not caption_tracks:
+                logs.append("Nenhuma faixa de legenda disponível no playerResponse do YouTube.")
+                return ""
+                
+            logs.append(f"Encontradas {len(caption_tracks)} faixas de legenda no playerResponse.")
+            # Escolhe o melhor idioma
+            target_track = None
+            for lang in ['pt', 'en', 'es']:
+                for track in caption_tracks:
+                    if track.get("languageCode", "").startswith(lang):
+                        target_track = track
+                        break
+                if target_track:
+                    break
+            
+            if not target_track:
+                target_track = caption_tracks[0]
+                
+            lang_code = target_track.get("languageCode", "unknown")
+            base_url = target_track.get("baseUrl")
+            logs.append(f"Selecionada legenda no idioma: {lang_code}")
+            
+            if not base_url:
+                logs.append("A faixa de legenda selecionada não possui baseUrl.")
+                return ""
+                
+            logs.append("Baixando XML da legenda...")
+            resp = httpx.get(base_url, timeout=10.0)
+            resp.raise_for_status()
+            
+            root = ET.fromstring(resp.content)
+            texts = []
+            for elem in root.findall(".//text"):
+                if elem.text:
+                    texts.append(html.unescape(elem.text))
+            
+            logs.append(f"Legenda extraída com sucesso via Playwright ({len(texts)} segmentos).")
+            return " ".join(texts)
+            
+    except Exception as e:
+        logs.append(f"Extração Playwright do YouTube falhou: {str(e)}")
+        return ""
+
 def try_youtube_transcript_api(url: str, logs: list) -> str:
     video_id = extract_youtube_id(url)
     if not video_id:
@@ -38,7 +114,15 @@ def try_youtube_transcript_api(url: str, logs: list) -> str:
         return " ".join([t['text'] for t in transcript_list])
     except Exception as e:
         logs.append(f"youtube-transcript-api falhou: {str(e)}")
-        return ""
+        
+    try:
+        text = extract_youtube_transcript_via_playwright(url, logs)
+        if text:
+            return text
+    except Exception as e:
+        logs.append(f"Fallback Playwright para transcrição do YouTube falhou: {str(e)}")
+        
+    return ""
 
 def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -> tuple[bool, str]:
     # Baixa apenas áudio e tenta extrair a legenda (descrição)
@@ -52,7 +136,7 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
         }],
         'extractor_args': {
             'youtube': {
-                'player_client': 'android,web',
+                'player_client': ['android', 'web'],
             }
         },
         'quiet': True,
