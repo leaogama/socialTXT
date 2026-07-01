@@ -12,13 +12,14 @@ from playwright.sync_api import sync_playwright
 
 # Instância global do modelo Whisper para não recarregar a cada requisição
 _whisper_model = None
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 
 def get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
-        logging.info("Carregando modelo Whisper (small)... Isso pode demorar na primeira vez.")
+        logging.info(f"Carregando modelo Whisper ({WHISPER_MODEL_NAME})... Isso pode demorar na primeira vez.")
         # Usando cpu e int8 para economizar memória na VPS
-        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+        _whisper_model = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8")
     return _whisper_model
 
 def extract_youtube_id(url: str) -> str:
@@ -31,7 +32,7 @@ def try_youtube_transcript_api(url: str) -> str:
         return ""
     try:
         logging.info("Tentando youtube-transcript-api...")
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['pt', 'en', 'es'])
+        transcript_list = YouTubeTranscriptApi().fetch(video_id, languages=['pt', 'en', 'es'])
         return " ".join([t['text'] for t in transcript_list])
     except Exception as e:
         logging.warning("youtube-transcript-api falhou: %s", e)

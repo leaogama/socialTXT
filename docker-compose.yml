@@ -20,6 +20,7 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
       - LLM_API_URL=${LLM_API_URL:-}
+      - WHISPER_MODEL=${WHISPER_MODEL:-tiny}
     volumes:
       - socialtxt_data:/app/data
       # Caso precise de cookies para o Instagram, descomente abaixo:
