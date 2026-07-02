@@ -642,7 +642,7 @@ header h1 {
     letter-spacing: -1px;
 }
 
-header h1 span {
+header h1 span:not(.app-version-badge) {
     background: linear-gradient(135deg, var(--primary), var(--accent));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
