@@ -18,34 +18,106 @@ WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 PROXY_URL = os.getenv("PROXY_URL", "").strip()
 
 def get_proxy_config() -> dict:
-    """Retorna configurações de proxy nos formatos usados por cada lib.
-    
-    Returns:
-        dict com chaves:
-        - 'url': string da URL do proxy (ou vazio)
-        - 'requests': dict para httpx/requests ({"http://": ..., "https://": ...})
-        - 'playwright': dict para Playwright ({"server": ...})
-        - 'configured': bool indicando se proxy está ativo
-    """
+    """Retorna configurações de proxy nos formatos usados por cada lib."""
     if not PROXY_URL:
-        return {
-            'url': '',
-            'requests': {},
-            'playwright': {},
-            'configured': False
-        }
+        return {'url': '', 'requests': {}, 'playwright': {}, 'configured': False}
     
     return {
         'url': PROXY_URL,
-        'requests': {
-            'http://': PROXY_URL,
-            'https://': PROXY_URL,
-        },
-        'playwright': {
-            'server': PROXY_URL
-        },
+        'requests': {'http://': PROXY_URL, 'https://': PROXY_URL},
+        'playwright': {'server': PROXY_URL},
         'configured': True
     }
+
+# --- Configuração de Browser Profile Persistente ---
+USE_BROWSER_PROFILE = os.getenv("USE_BROWSER_PROFILE", "false").lower() == "true"
+BROWSER_PROFILE_PATH = os.getenv("BROWSER_PROFILE_PATH", "/app/data/browser-profile")
+
+def get_browser_profile_status() -> dict:
+    """Verifica o status do profile de navegador e sessão do YouTube."""
+    if not USE_BROWSER_PROFILE:
+        return {
+            "enabled": False,
+            "profile_path": BROWSER_PROFILE_PATH,
+            "profile_exists": False,
+            "youtube_session": {"detected": False, "cookie_count": 0, "last_check": ""}
+        }
+    
+    exists = os.path.exists(BROWSER_PROFILE_PATH)
+    
+    # Faz uma verificação rápida de sessão se o diretório existir
+    session_detected = False
+    cookie_count = 0
+    if exists:
+        try:
+            with sync_playwright() as p:
+                context = p.chromium.launch_persistent_context(
+                    BROWSER_PROFILE_PATH,
+                    headless=True,
+                    args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-setuid-sandbox']
+                )
+                cookies = context.cookies("https://www.youtube.com")
+                cookie_count = len(cookies)
+                # Verifica se existem cookies comuns de auth do Google/YouTube
+                if any(c['name'] in ['SID', 'SSID', 'LOGIN_INFO'] for c in cookies):
+                    session_detected = True
+                context.close()
+        except Exception as e:
+            logging.error(f"Erro ao verificar sessão do youtube: {e}")
+            
+    import datetime
+    now = datetime.datetime.now().isoformat()
+    return {
+        "enabled": True,
+        "profile_path": BROWSER_PROFILE_PATH,
+        "profile_exists": exists,
+        "youtube_session": {
+            "detected": session_detected,
+            "cookie_count": cookie_count,
+            "last_check": now if exists else ""
+        }
+    }
+
+def export_cookies_from_profile(logs: list) -> str:
+    """Exporta cookies do browser profile persistente para um arquivo Netscape temporário."""
+    if not USE_BROWSER_PROFILE or not os.path.exists(BROWSER_PROFILE_PATH):
+        return ""
+    
+    try:
+        logs.append("Exportando cookies do browser profile persistente...")
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                BROWSER_PROFILE_PATH,
+                headless=True,
+                args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-setuid-sandbox']
+            )
+            cookies = context.cookies()
+            context.close()
+            
+        if not cookies:
+            logs.append("Nenhum cookie encontrado no profile.")
+            return ""
+            
+        # Converter para formato Netscape
+        lines = ["# Netscape HTTP Cookie File"]
+        for cookie in cookies:
+            domain = cookie.get("domain", "")
+            include_subdomains = "TRUE" if domain.startswith(".") else "FALSE"
+            path = cookie.get("path", "/")
+            is_secure = "TRUE" if cookie.get("secure", False) else "FALSE"
+            expiry = str(int(cookie.get("expires", 0)))
+            name = cookie.get("name", "")
+            value = cookie.get("value", "")
+            lines.append(f"{domain}\t{include_subdomains}\t{path}\t{is_secure}\t{expiry}\t{name}\t{value}")
+            
+        cookie_path = f"/tmp/browser_cookies_{uuid.uuid4().hex[:8]}.txt"
+        with open(cookie_path, "w") as f:
+            f.write("\n".join(lines))
+        logs.append(f"Cookies exportados com sucesso ({len(cookies)} cookies) para uso pelo yt-dlp.")
+        return cookie_path
+    except Exception as e:
+        logs.append(f"Erro ao exportar cookies do profile: {e}")
+        return ""
 
 def get_whisper_model():
     global _whisper_model
@@ -104,14 +176,13 @@ def extract_youtube_id(url: str) -> str:
     return match.group(1) if match else ""
 
 def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
-    logs.append("Tentando obter transcrição do YouTube via Playwright (bypassing datacenter IP block)...")
+    logs.append("Tentando obter transcrição do YouTube via Playwright...")
     proxy_cfg = get_proxy_config()
     try:
         import html
         import xml.etree.ElementTree as ET
         
         with sync_playwright() as p:
-            # Configura proxy no nível do browser se disponível
             launch_args = {
                 'headless': True,
                 'args': [
@@ -124,29 +195,38 @@ def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
                 launch_args['proxy'] = proxy_cfg['playwright']
                 logs.append(f"Playwright usando proxy residencial configurado.")
             
-            browser = p.chromium.launch(**launch_args)
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-            )
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             
-            # Tenta carregar cookies.txt para o Playwright
-            data_dir = os.getenv("DATA_DIR", "/app/data")
-            cookie_file = os.path.join(data_dir, "cookies.txt")
-            if not os.path.exists(cookie_file):
-                cookie_file = "/app/cookies.txt"
+            if USE_BROWSER_PROFILE:
+                logs.append(f"Playwright usando perfil persistente em: {BROWSER_PROFILE_PATH}")
+                launch_args['user_agent'] = user_agent
+                context = p.chromium.launch_persistent_context(BROWSER_PROFILE_PATH, **launch_args)
+            else:
+                browser = p.chromium.launch(**launch_args)
+                context = browser.new_context(user_agent=user_agent)
                 
-            if os.path.exists(cookie_file):
-                playwright_cookies = parse_cookies_for_playwright(cookie_file)
-                if playwright_cookies:
-                    logs.append(f"Injetando {len(playwright_cookies)} cookies no navegador Playwright...")
-                    context.add_cookies(playwright_cookies)
+                # Tenta carregar cookies.txt fallback se profile estiver desligado
+                data_dir = os.getenv("DATA_DIR", "/app/data")
+                cookie_file = os.path.join(data_dir, "cookies.txt")
+                if not os.path.exists(cookie_file):
+                    cookie_file = "/app/cookies.txt"
+                    
+                if os.path.exists(cookie_file):
+                    playwright_cookies = parse_cookies_for_playwright(cookie_file)
+                    if playwright_cookies:
+                        logs.append(f"Injetando {len(playwright_cookies)} cookies no navegador Playwright...")
+                        context.add_cookies(playwright_cookies)
             
             page = context.new_page()
             logs.append("Playwright acessando página do YouTube...")
             page.goto(url, wait_until="networkidle", timeout=30000)
             
             player_response = page.evaluate("() => window.ytInitialPlayerResponse")
-            browser.close()
+            
+            if USE_BROWSER_PROFILE:
+                context.close()
+            else:
+                browser.close()
             
             if not player_response:
                 logs.append("Objeto ytInitialPlayerResponse não encontrado no DOM do YouTube.")
@@ -240,16 +320,9 @@ def try_youtube_transcript_api(url: str, logs: list) -> str:
     except Exception as e:
         logs.append(f"youtube-transcript-api falhou: {str(e)}")
         
-    try:
-        text = extract_youtube_transcript_via_playwright(url, logs)
-        if text:
-            return text
-    except Exception as e:
-        logs.append(f"Fallback Playwright para transcrição do YouTube falhou: {str(e)}")
-        
     return ""
 
-def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -> tuple[bool, str]:
+def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list, use_browser_cookies: bool = False) -> tuple[bool, str]:
     # Baixa apenas áudio e tenta extrair a legenda (descrição)
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -276,17 +349,24 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
     else:
         logs.append("⚠ yt-dlp sem proxy configurado. Download pode falhar com 403 em IPs de datacenter.")
     
-    # Busca cookies na pasta de dados persistente (/app/data/cookies.txt) ou na raiz (/app/cookies.txt)
-    data_dir = os.getenv("DATA_DIR", "/app/data")
-    cookie_file = os.path.join(data_dir, "cookies.txt")
-    if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 150:
-        logs.append(f"Arquivo cookies.txt válido encontrado em {cookie_file}. Injetando cookies no yt-dlp...")
-        ydl_opts['cookiefile'] = cookie_file
-    elif os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 150:
-        logs.append("Arquivo cookies.txt válido encontrado na raiz. Injetando cookies no yt-dlp...")
-        ydl_opts['cookiefile'] = "cookies.txt"
+    cookie_temp_path = None
+    if use_browser_cookies and USE_BROWSER_PROFILE:
+        cookie_temp_path = export_cookies_from_profile(logs)
+        if cookie_temp_path:
+            ydl_opts['cookiefile'] = cookie_temp_path
+            logs.append(f"Injetando cookies exportados do profile no yt-dlp...")
     else:
-        logs.append("Nenhum arquivo cookies.txt válido encontrado em /app/data/cookies.txt ou na raiz (usando requests sem cookies).")
+        # Busca cookies na pasta de dados persistente (/app/data/cookies.txt) ou na raiz (/app/cookies.txt)
+        data_dir = os.getenv("DATA_DIR", "/app/data")
+        cookie_file = os.path.join(data_dir, "cookies.txt")
+        if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 150:
+            logs.append(f"Arquivo cookies.txt válido encontrado em {cookie_file}. Injetando cookies no yt-dlp...")
+            ydl_opts['cookiefile'] = cookie_file
+        elif os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 150:
+            logs.append("Arquivo cookies.txt válido encontrado na raiz. Injetando cookies no yt-dlp...")
+            ydl_opts['cookiefile'] = "cookies.txt"
+        else:
+            logs.append("Nenhum arquivo cookies.txt válido encontrado em /app/data/cookies.txt ou na raiz (usando requests sem cookies).")
         
     try:
         logs.append("Iniciando download e processamento de áudio via yt-dlp...")
@@ -298,6 +378,12 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
     except Exception as e:
         logs.append(f"yt-dlp falhou ao extrair áudio: {str(e)}")
         return False, ""
+    finally:
+        if cookie_temp_path and os.path.exists(cookie_temp_path):
+            try:
+                os.remove(cookie_temp_path)
+            except:
+                pass
 
 def extract_with_playwright(url: str, output_base: str, logs: list) -> tuple[bool, str]:
     """Usa o Playwright (navegador real headless) para contornar bloqueios do Instagram e X"""
@@ -414,6 +500,26 @@ def transcribe_audio(file_path: str, logs: list) -> str:
         logs.append(f"Erro ao transcrever áudio com Whisper: {str(e)}")
         return ""
 
+def process_downloaded_audio(base_path: str, description: str, logs: list) -> str:
+    """Extrai e processa áudios gerados pelo yt-dlp."""
+    result_text = ""
+    if description:
+        result_text += f"Legenda/Descrição original:\n{description}\n\n"
+        
+    files = glob.glob(f"{base_path}*")
+    logs.append(f"Arquivos de áudio prontos para transcrição local: {files}")
+    for f in files:
+        transcription = transcribe_audio(f, logs)
+        if transcription:
+            result_text += f"Transcrição do áudio:\n{transcription}"
+        try:
+            os.remove(f)
+            logs.append(f"Limpeza concluída. Arquivo removido: {f}")
+        except OSError as e:
+            logs.append(f"Erro ao remover arquivo temporário {f}: {str(e)}")
+            
+    return result_text.strip()
+
 def extract_social_content(url: str) -> tuple[str, list[str]]:
     debug_logs = []
     try:
@@ -422,47 +528,65 @@ def extract_social_content(url: str) -> tuple[str, list[str]]:
     except Exception:
         debug_logs.append("Versão do App: Desconhecida")
         
-    result_text = ""
-    
-    # 1. Tentar nativo do YouTube primeiro
+    # --- PIPELINE DO YOUTUBE (5 Níveis) ---
     if "youtube.com" in url or "youtu.be" in url:
-        debug_logs.append("Detectada URL do YouTube. Iniciando métodos de extração...")
+        debug_logs.append("Detectada URL do YouTube. Iniciando pipeline de extração de 5 níveis...")
+        
+        # Nível 1: youtube-transcript-api
+        debug_logs.append("--- NÍVEL 1: youtube-transcript-api (Nativo) ---")
         text = try_youtube_transcript_api(url, debug_logs)
-        if text:
-            return f"Transcrição do YouTube: {text}", debug_logs
+        if text: return f"Transcrição do YouTube: {text}", debug_logs
+            
+        temp_id = str(uuid.uuid4())
+        base_path = f"/tmp/{temp_id}"
+        
+        # Nível 2: yt-dlp sem cookies do perfil
+        debug_logs.append("--- NÍVEL 2: yt-dlp sem cookies persistentes ---")
+        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
+        if success:
+            return process_downloaded_audio(base_path, description, debug_logs), debug_logs
+            
+        # Nível 3: yt-dlp com cookies exportados do perfil persistente
+        debug_logs.append("--- NÍVEL 3: yt-dlp com cookies do perfil persistente ---")
+        if USE_BROWSER_PROFILE:
+            success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=True)
+            if success:
+                return process_downloaded_audio(base_path, description, debug_logs), debug_logs
+        else:
+            debug_logs.append("PULADO: USE_BROWSER_PROFILE está false.")
+            
+        # Nível 4: Playwright (Perfil Persistente)
+        debug_logs.append("--- NÍVEL 4: Extração via Playwright (Navegação Headless) ---")
+        text = extract_youtube_transcript_via_playwright(url, debug_logs)
+        if text: return f"Transcrição do YouTube: {text}", debug_logs
+            
+        # Nível 5: Falha
+        debug_logs.append("--- NÍVEL 5: Falha Total ---")
+        debug_logs.append("Todas as tentativas de extração do YouTube falharam.")
+        return "", debug_logs
 
+
+    # --- OUTRAS REDES (Instagram, TikTok, X) ---
     temp_id = str(uuid.uuid4())
     base_path = f"/tmp/{temp_id}"
 
     success = False
     description = ""
 
-    # 2. Instagram: tenta Playwright primeiro (navegador real)
+    # Instagram: tenta Playwright primeiro (navegador real)
     if "instagram.com" in url:
         debug_logs.append("Detectada URL do Instagram. Iniciando fluxo com Playwright...")
         success, description = extract_with_playwright(url, base_path, debug_logs)
     
-    # 3. Fallback: Baixar áudio + Descrição com yt-dlp (com suporte a cookies opcional)
+    # Fallback: Baixar áudio + Descrição com yt-dlp
     if not success:
         debug_logs.append("Iniciando extração via download com yt-dlp + transcrição Whisper...")
-        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs)
+        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
     
-    if description:
-        result_text += f"Legenda/Descrição original:\n{description}\n\n"
-
+    result_text = ""
     if success:
-        # Encontra o arquivo de mídia gerado (.mp4, .mp3, .m4a, etc) e transcreve
-        files = glob.glob(f"{base_path}*")
-        debug_logs.append(f"Arquivos de áudio prontos para transcrição local: {files}")
-        for f in files:
-            transcription = transcribe_audio(f, debug_logs)
-            if transcription:
-                result_text += f"Transcrição do áudio:\n{transcription}"
-            # Limpeza
-            try:
-                os.remove(f)
-                debug_logs.append(f"Limpeza concluída. Arquivo removido: {f}")
-            except OSError as e:
-                debug_logs.append(f"Erro ao remover arquivo temporário {f}: {str(e)}")
+        result_text = process_downloaded_audio(base_path, description, debug_logs)
+    elif description:
+        result_text = f"Legenda/Descrição original:\n{description}\n\n"
 
     return result_text.strip(), debug_logs

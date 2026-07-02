@@ -75,6 +75,22 @@ O YouTube bloqueia ativamente IPs de datacenters e provedores de cloud (AWS, Azu
 
 ---
 
+## 🖥️ Browser Profile Persistente (Fallback)
+
+Como alternativa intermediária antes de contratar um proxy pago, você pode ativar o **Browser Profile Persistente**. Isso cria uma pasta na VPS (`/app/data/browser-profile`) onde o Playwright salvará os cookies, tokens e sessão do YouTube.
+
+Isso **não resolve o bloqueio por reputação do IP da VPS**, mas resolve erros relacionados à falta de cookies, consentimento e sessão não autenticada. O sistema exportará automaticamente esses cookies para uso no `yt-dlp`.
+
+### Como ativar
+
+1.  **Configure a variável de ambiente `USE_BROWSER_PROFILE=true`** (no `.env` ou Portainer).
+2.  Na primeira extração, o sistema criará o perfil.
+3.  Opcional: Você pode acessar a VPS via VNC, abrir o Chromium nesse diretório e fazer login manual no Google para salvar uma sessão hiper-persistente (não recomendado usar conta principal).
+
+> 💡 O status do perfil e da sessão do YouTube podem ser acompanhados na interface web (⚙️ Configurações > 🍪 Proteção Anti-Bot).
+
+---
+
 ## 🔌 Integração & API
 
 ### 1. Chamada HTTP REST

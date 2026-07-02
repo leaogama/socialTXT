@@ -23,6 +23,9 @@ services:
       - WHISPER_MODEL=${WHISPER_MODEL:-tiny}
       # URL do proxy residencial para contornar bloqueios do YouTube (ex: http://user:pass@host:port)
       - PROXY_URL=${PROXY_URL:-}
+      # Opção de fallback: usar perfil persistente do navegador para manter cookies
+      - USE_BROWSER_PROFILE=${USE_BROWSER_PROFILE:-false}
+      - BROWSER_PROFILE_PATH=${BROWSER_PROFILE_PATH:-/app/data/browser-profile}
     volumes:
       - socialtxt_data:/app/data
       # Caso precise de cookies para o Instagram, descomente abaixo:

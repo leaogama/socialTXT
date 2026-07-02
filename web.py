@@ -189,6 +189,20 @@ def get_proxy_status(username: str = Depends(verify_credentials)):
     
     return {"configured": True, "protocol": protocol}
 
+@app.get("/api/browser_profile_status")
+def get_browser_profile_status_api(username: str = Depends(verify_credentials)):
+    try:
+        from extractor import get_browser_profile_status
+        return get_browser_profile_status()
+    except Exception as e:
+        return {
+            "enabled": False,
+            "profile_path": "",
+            "profile_exists": False,
+            "youtube_session": {"detected": False, "cookie_count": 0, "last_check": ""},
+            "error": str(e)
+        }
+
 @app.post("/api/upload_cookies")
 async def upload_cookies(file: UploadFile = File(...), username: str = Depends(verify_credentials)):
     if not file.filename.endswith(".txt") and not file.filename.endswith(".json"):

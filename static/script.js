@@ -828,9 +828,46 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
+    // ===== VERIFICAR STATUS DO BROWSER PROFILE =====
+    function loadBrowserProfileStatus() {
+        const icon = document.getElementById('profile-status-icon');
+        const text = document.getElementById('profile-status-text');
+        if (!icon || !text) return;
+
+        fetch(window.location.origin + '/api/browser_profile_status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.enabled) {
+                    if (data.youtube_session.detected) {
+                        icon.textContent = '✅';
+                        text.textContent = `Ativo (Sessão OK: ${data.youtube_session.cookie_count} cookies)`;
+                        text.style.color = 'var(--success, #4ade80)';
+                    } else if (data.profile_exists) {
+                        icon.textContent = '⚠️';
+                        text.textContent = 'Ativo (Sem sessão detectada)';
+                        text.style.color = 'var(--warning, #fbbf24)';
+                    } else {
+                        icon.textContent = '⏳';
+                        text.textContent = 'Ativo (Aguardando primeira execução)';
+                        text.style.color = 'var(--text-muted)';
+                    }
+                } else {
+                    icon.textContent = '❌';
+                    text.textContent = 'Desativado';
+                    text.style.color = 'var(--text-muted)';
+                }
+            })
+            .catch(() => {
+                icon.textContent = '❓';
+                text.textContent = 'Indisponível';
+                text.style.color = 'var(--text-muted)';
+            });
+    }
+
     // ===== INICIALIZAÇÃO =====
     initSidebar();
     loadSettings();
     setupApiTabs();
     loadProxyStatus();
+    loadBrowserProfileStatus();
 });
