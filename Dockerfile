@@ -3,8 +3,11 @@ FROM python:3.11-slim
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies (ffmpeg is required by yt-dlp and faster-whisper)
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (ffmpeg for yt-dlp/whisper, curl/unzip to download Deno)
+RUN apt-get update && apt-get install -y ffmpeg curl unzip && \
+    curl -fsSL https://deno.land/install.sh | sh && \
+    mv /root/.deno/bin/deno /usr/local/bin/deno && \
+    apt-get purge -y curl unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
 COPY requirements.txt .

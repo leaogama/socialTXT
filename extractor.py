@@ -136,9 +136,10 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
         }],
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv_simply', 'android', 'web'],
+                'player_client': ['android', 'web'],
             }
         },
+        'remote_components': ['ejs:github'],
         'quiet': True,
         'no_warnings': True
     }
