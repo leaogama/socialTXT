@@ -22,6 +22,50 @@ def get_whisper_model():
         _whisper_model = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8")
     return _whisper_model
 
+def parse_cookies_for_playwright(cookie_file: str) -> list:
+    playwright_cookies = []
+    if not os.path.exists(cookie_file):
+        return playwright_cookies
+    try:
+        with open(cookie_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    domain = parts[0]
+                    clean_domain = domain
+                    if clean_domain.startswith('.'):
+                        clean_domain = clean_domain[1:]
+                    
+                    # Filtra apenas domínios relevantes do google/youtube para evitar poluição no Playwright
+                    if not any(d in clean_domain for d in ['youtube.com', 'google.com', 'google.com.br']):
+                        continue
+                        
+                    name = parts[5]
+                    value = parts[6]
+                    path = parts[2]
+                    secure = parts[3].upper() == 'TRUE'
+                    try:
+                        expires = int(parts[4])
+                    except ValueError:
+                        expires = -1
+                        
+                    cookie = {
+                        'name': name,
+                        'value': value,
+                        'domain': clean_domain,
+                        'path': path,
+                        'secure': secure
+                    }
+                    if expires > 0:
+                        cookie['expires'] = expires
+                    playwright_cookies.append(cookie)
+    except Exception as e:
+        logging.error(f"Erro ao analisar cookies para Playwright: {e}")
+    return playwright_cookies
+
 def extract_youtube_id(url: str) -> str:
     match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
     return match.group(1) if match else ""
@@ -44,6 +88,19 @@ def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
+            
+            # Tenta carregar cookies.txt para o Playwright
+            data_dir = os.getenv("DATA_DIR", "/app/data")
+            cookie_file = os.path.join(data_dir, "cookies.txt")
+            if not os.path.exists(cookie_file):
+                cookie_file = "/app/cookies.txt"
+                
+            if os.path.exists(cookie_file):
+                playwright_cookies = parse_cookies_for_playwright(cookie_file)
+                if playwright_cookies:
+                    logs.append(f"Injetando {len(playwright_cookies)} cookies no navegador Playwright...")
+                    context.add_cookies(playwright_cookies)
+            
             page = context.new_page()
             logs.append("Playwright acessando página do YouTube...")
             page.goto(url, wait_until="networkidle", timeout=25000)
