@@ -186,11 +186,6 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': f'{output_base}.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '128',
-        }],
         'extractor_args': {
             'youtube': {
                 'player_client': ['android', 'web'],
