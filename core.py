@@ -9,9 +9,15 @@ from dotenv import load_dotenv
 
 from extractor import extract_social_content
 
+import datetime
+import os
+from dotenv import load_dotenv
+
 load_dotenv()
 
-VERSION = "1.5.2"
+# Define a versão baseada no horário de inicialização do app (UTC-3 / Horário de Brasília)
+brasilia_tz = datetime.timezone(datetime.timedelta(hours=-3))
+VERSION = datetime.datetime.now(brasilia_tz).strftime("%y%m%d-%H%M")
 
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_API_URL = os.getenv(

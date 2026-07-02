@@ -7,7 +7,7 @@ import httpx
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
@@ -179,4 +179,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def read_root(username: str = Depends(verify_credentials)):
-    return FileResponse("static/index.html")
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    # Injeta a versão dinâmica no HTML para cache-busting automático
+    content = content.replace("?v=APP_VERSION", f"?v={VERSION}")
+    
+    return HTMLResponse(content=content)
