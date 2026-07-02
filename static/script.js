@@ -1,4 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ===== BUSCAR VERSÃO =====
+    function loadAppVersion() {
+        const badge = document.getElementById('app-version-badge');
+        if (!badge) return;
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => {
+                if (data.version) {
+                    badge.textContent = `v${data.version}`;
+                }
+            })
+            .catch(err => {
+                console.error("Erro ao buscar versão da API:", err);
+                badge.textContent = 'v1.5.0'; // Fallback
+            });
+    }
+    loadAppVersion();
+
     // ===== ELEMENTOS =====
     const form = document.getElementById('summary-form');
     const urlInput = document.getElementById('url-input');

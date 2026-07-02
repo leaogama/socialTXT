@@ -16,7 +16,8 @@ from core import (
     get_transcript_text,
     summarize_with_llm,
     get_backend_settings,
-    save_backend_settings
+    save_backend_settings,
+    VERSION
 )
 
 # Configura logs
@@ -166,6 +167,10 @@ async def api_summarize(request: SummarizeRequest, username: str = Depends(verif
     except Exception as error:
         logging.exception("Erro inesperado.")
         raise HTTPException(status_code=500, detail=str(error))
+
+@app.get("/api/version")
+def get_version():
+    return {"version": VERSION}
 
 # Serve the static files under /static but also route the root to index.html
 import os

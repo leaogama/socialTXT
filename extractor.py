@@ -341,6 +341,12 @@ def transcribe_audio(file_path: str, logs: list) -> str:
 
 def extract_social_content(url: str) -> tuple[str, list[str]]:
     debug_logs = []
+    try:
+        from core import VERSION
+        debug_logs.append(f"Versão do App: {VERSION}")
+    except Exception:
+        debug_logs.append("Versão do App: Desconhecida")
+        
     result_text = ""
     
     # 1. Tentar nativo do YouTube primeiro
