@@ -802,8 +802,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // ===== VERIFICAR STATUS DO PROXY =====
+    function loadProxyStatus() {
+        const icon = document.getElementById('proxy-status-icon');
+        const text = document.getElementById('proxy-status-text');
+        if (!icon || !text) return;
+
+        fetch(window.location.origin + '/api/proxy_status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.configured) {
+                    icon.textContent = '✅';
+                    text.textContent = `Ativo (${data.protocol})`;
+                    text.style.color = 'var(--success, #4ade80)';
+                } else {
+                    icon.textContent = '⚠️';
+                    text.textContent = 'Não configurado';
+                    text.style.color = 'var(--warning, #fbbf24)';
+                }
+            })
+            .catch(() => {
+                icon.textContent = '❓';
+                text.textContent = 'Indisponível';
+                text.style.color = 'var(--text-muted)';
+            });
+    }
+
     // ===== INICIALIZAÇÃO =====
     initSidebar();
     loadSettings();
     setupApiTabs();
+    loadProxyStatus();
 });

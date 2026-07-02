@@ -172,6 +172,23 @@ async def api_summarize(request: SummarizeRequest, username: str = Depends(verif
 def get_version():
     return {"version": VERSION}
 
+@app.get("/api/proxy_status")
+def get_proxy_status(username: str = Depends(verify_credentials)):
+    proxy_url = os.getenv("PROXY_URL", "").strip()
+    if not proxy_url:
+        return {"configured": False, "protocol": ""}
+    
+    # Detecta protocolo sem expor a URL completa
+    protocol = "http"
+    if proxy_url.startswith("socks5"):
+        protocol = "socks5"
+    elif proxy_url.startswith("socks4"):
+        protocol = "socks4"
+    elif proxy_url.startswith("https"):
+        protocol = "https"
+    
+    return {"configured": True, "protocol": protocol}
+
 @app.post("/api/upload_cookies")
 async def upload_cookies(file: UploadFile = File(...), username: str = Depends(verify_credentials)):
     if not file.filename.endswith(".txt") and not file.filename.endswith(".json"):

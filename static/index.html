@@ -84,6 +84,15 @@
                     </label>
                     <button id="upload-cookies-btn" class="secondary-btn full-width">📤 Enviar Cookies</button>
                     <div id="cookie-upload-status" style="font-size: 0.85rem; margin-top: 5px; text-align: center;"></div>
+
+                    <!-- Status do Proxy Residencial -->
+                    <div style="margin-top: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                            <span id="proxy-status-icon">⏳</span>
+                            <span>Proxy Residencial: <strong id="proxy-status-text">Verificando...</strong></span>
+                            <span class="help-trigger" title="Um proxy residencial é necessário para contornar bloqueios de IP do YouTube em servidores cloud. Configure a variável PROXY_URL no docker-compose ou Portainer.">?</span>
+                        </div>
+                    </div>
                 </div>
             </details>
 

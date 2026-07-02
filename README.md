@@ -53,6 +53,28 @@ O **SocialTXT** é um microsserviço local e plataforma web para extração de t
 
 ---
 
+## 🌐 Proxy Residencial (Obrigatório para YouTube em VPS)
+
+O YouTube bloqueia ativamente IPs de datacenters e provedores de cloud (AWS, Azure, GCP, Oracle, etc.). Para que a extração de transcrições e áudio funcione corretamente em servidores, é **necessário configurar um proxy residencial**.
+
+### Como configurar
+
+1.  **Contrate um serviço de proxy residencial** (recomendados: [BrightData](https://brightdata.com), [SmartProxy](https://smartproxy.com), [Oxylabs](https://oxylabs.io)).
+2.  **Configure a variável de ambiente `PROXY_URL`** com a URL do proxy:
+    ```bash
+    # No arquivo .env ou diretamente no Portainer:
+    PROXY_URL=http://usuario:senha@host-do-proxy:porta
+    # Também aceita SOCKS5:
+    PROXY_URL=socks5://usuario:senha@host-do-proxy:porta
+    ```
+3.  O proxy será usado automaticamente em **todos os métodos de extração**: `youtube-transcript-api`, Playwright e `yt-dlp`.
+
+> ⚠️ **Proxies de datacenter não funcionam** — o YouTube os bloqueia da mesma forma que o IP direto do servidor. Use apenas proxies **residenciais rotativos**.
+
+> 💡 O status do proxy pode ser verificado na interface web, na seção **⚙️ Configurações > 🍪 Proteção Anti-Bot**.
+
+---
+
 ## 🔌 Integração & API
 
 ### 1. Chamada HTTP REST

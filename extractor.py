@@ -14,6 +14,39 @@ from playwright.sync_api import sync_playwright
 _whisper_model = None
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 
+# --- Configuração de Proxy Residencial ---
+PROXY_URL = os.getenv("PROXY_URL", "").strip()
+
+def get_proxy_config() -> dict:
+    """Retorna configurações de proxy nos formatos usados por cada lib.
+    
+    Returns:
+        dict com chaves:
+        - 'url': string da URL do proxy (ou vazio)
+        - 'requests': dict para httpx/requests ({"http://": ..., "https://": ...})
+        - 'playwright': dict para Playwright ({"server": ...})
+        - 'configured': bool indicando se proxy está ativo
+    """
+    if not PROXY_URL:
+        return {
+            'url': '',
+            'requests': {},
+            'playwright': {},
+            'configured': False
+        }
+    
+    return {
+        'url': PROXY_URL,
+        'requests': {
+            'http://': PROXY_URL,
+            'https://': PROXY_URL,
+        },
+        'playwright': {
+            'server': PROXY_URL
+        },
+        'configured': True
+    }
+
 def get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
@@ -72,21 +105,28 @@ def extract_youtube_id(url: str) -> str:
 
 def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
     logs.append("Tentando obter transcrição do YouTube via Playwright (bypassing datacenter IP block)...")
+    proxy_cfg = get_proxy_config()
     try:
         import html
         import xml.etree.ElementTree as ET
         
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
+            # Configura proxy no nível do browser se disponível
+            launch_args = {
+                'headless': True,
+                'args': [
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox',
                     '--disable-setuid-sandbox'
                 ]
-            )
+            }
+            if proxy_cfg['configured']:
+                launch_args['proxy'] = proxy_cfg['playwright']
+                logs.append(f"Playwright usando proxy residencial configurado.")
+            
+            browser = p.chromium.launch(**launch_args)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             )
             
             # Tenta carregar cookies.txt para o Playwright
@@ -103,7 +143,7 @@ def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
             
             page = context.new_page()
             logs.append("Playwright acessando página do YouTube...")
-            page.goto(url, wait_until="networkidle", timeout=25000)
+            page.goto(url, wait_until="networkidle", timeout=30000)
             
             player_response = page.evaluate("() => window.ytInitialPlayerResponse")
             browser.close()
@@ -143,7 +183,11 @@ def extract_youtube_transcript_via_playwright(url: str, logs: list) -> str:
                 return ""
                 
             logs.append("Baixando XML da legenda...")
-            resp = httpx.get(base_url, timeout=10.0)
+            # Usa proxy também no download da legenda XML
+            http_client_kwargs = {'timeout': 10.0}
+            if proxy_cfg['configured']:
+                http_client_kwargs['proxy'] = proxy_cfg['url']
+            resp = httpx.get(base_url, **http_client_kwargs)
             resp.raise_for_status()
             
             root = ET.fromstring(resp.content)
@@ -164,9 +208,33 @@ def try_youtube_transcript_api(url: str, logs: list) -> str:
     if not video_id:
         logs.append("Falha ao extrair ID do vídeo a partir da URL do YouTube.")
         return ""
+    
+    proxy_cfg = get_proxy_config()
+    
+    # Monta kwargs opcionais para o YouTubeTranscriptApi
+    fetch_kwargs = {'languages': ['pt', 'en', 'es']}
+    if proxy_cfg['configured']:
+        # youtube-transcript-api aceita proxies no formato {"http": ..., "https": ...}
+        fetch_kwargs['proxies'] = {
+            'http': proxy_cfg['url'],
+            'https': proxy_cfg['url'],
+        }
+        logs.append(f"youtube-transcript-api usando proxy residencial configurado.")
+    else:
+        logs.append("⚠ Nenhum proxy configurado (PROXY_URL). IPs de datacenter são bloqueados pelo YouTube.")
+    
+    # Tenta também com cookies se disponível
+    data_dir = os.getenv("DATA_DIR", "/app/data")
+    cookie_file = os.path.join(data_dir, "cookies.txt")
+    if not os.path.exists(cookie_file):
+        cookie_file = "/app/cookies.txt"
+    if os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 150:
+        fetch_kwargs['cookies'] = cookie_file
+        logs.append(f"youtube-transcript-api usando cookies de {cookie_file}.")
+    
     try:
         logs.append("Tentando extrair transcrição nativa via youtube-transcript-api...")
-        transcript_list = YouTubeTranscriptApi().fetch(video_id, languages=['pt', 'en', 'es'])
+        transcript_list = YouTubeTranscriptApi().fetch(video_id, **fetch_kwargs)
         logs.append("Sucesso! Transcrição obtida de forma nativa do YouTube.")
         return " ".join([t['text'] for t in transcript_list])
     except Exception as e:
@@ -188,13 +256,25 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list) -
         'outtmpl': f'{output_base}.%(ext)s',
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
+                'player_client': ['web', 'tv'],
             }
         },
         'remote_components': ['ejs:github'],
         'quiet': True,
-        'no_warnings': True
+        'no_warnings': True,
+        'socket_timeout': 30,
+        'retries': 3,
+        'file_access_retries': 3,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     }
+    
+    # Configura proxy residencial se disponível
+    proxy_cfg = get_proxy_config()
+    if proxy_cfg['configured']:
+        ydl_opts['proxy'] = proxy_cfg['url']
+        logs.append(f"yt-dlp usando proxy residencial configurado.")
+    else:
+        logs.append("⚠ yt-dlp sem proxy configurado. Download pode falhar com 403 em IPs de datacenter.")
     
     # Busca cookies na pasta de dados persistente (/app/data/cookies.txt) ou na raiz (/app/cookies.txt)
     data_dir = os.getenv("DATA_DIR", "/app/data")

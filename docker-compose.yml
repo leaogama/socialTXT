@@ -21,6 +21,8 @@ services:
       - LLM_MODEL=${LLM_MODEL:-}
       - LLM_API_URL=${LLM_API_URL:-}
       - WHISPER_MODEL=${WHISPER_MODEL:-tiny}
+      # URL do proxy residencial para contornar bloqueios do YouTube (ex: http://user:pass@host:port)
+      - PROXY_URL=${PROXY_URL:-}
     volumes:
       - socialtxt_data:/app/data
       # Caso precise de cookies para o Instagram, descomente abaixo:
