@@ -71,6 +71,22 @@
                 </div>
             </details>
 
+            <!-- Seção: Anti-Bot (Cookies) -->
+            <details class="config-section" open>
+                <summary>🍪 Proteção Anti-Bot (Cookies)</summary>
+                <div class="config-body">
+                    <p class="api-intro" style="font-size: 0.85rem; margin-top: 0; margin-bottom: 10px;">
+                        Para extrair vídeos do YouTube e Instagram, a VPS precisa de cookies reais para não ser bloqueada. Exporte seu <code>cookies.txt</code> e faça o upload aqui.
+                    </p>
+                    <label class="label-with-help">
+                        <span>Arquivo de Cookies (.txt): <span class="help-trigger" title="Use uma extensão como 'Get cookies.txt LOCALLY' no YouTube, salve o arquivo e envie aqui.">?</span></span>
+                        <input type="file" id="cookie-file-input" accept=".txt,.json">
+                    </label>
+                    <button id="upload-cookies-btn" class="secondary-btn full-width">📤 Enviar Cookies</button>
+                    <div id="cookie-upload-status" style="font-size: 0.85rem; margin-top: 5px; text-align: center;"></div>
+                </div>
+            </details>
+
             <!-- Seção: Diretrizes (Gerenciador de Prompts) -->
             <details class="config-section" open>
                 <summary>📋 Gerenciador de Diretrizes</summary>

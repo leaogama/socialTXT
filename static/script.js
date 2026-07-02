@@ -53,6 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelDatalist = document.getElementById('model-datalist');
     const fetchModelsBtn = document.getElementById('fetch-models-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
+    
+    // Upload de Cookies
+    const cookieFileInput = document.getElementById('cookie-file-input');
+    const uploadCookiesBtn = document.getElementById('upload-cookies-btn');
+    const cookieUploadStatus = document.getElementById('cookie-upload-status');
 
     // Gerenciador de Diretrizes
     const promptListContainer = document.getElementById('promptListContainer');
@@ -550,6 +555,45 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.error("Erro ao salvar credenciais no backend:", e);
             alert('Aviso: As configurações foram salvas localmente no navegador, mas falhou ao salvar de forma persistente no servidor: ' + e.message);
+        }
+    });
+
+    // ===== UPLOAD DE COOKIES =====
+    uploadCookiesBtn.addEventListener('click', async () => {
+        const file = cookieFileInput.files[0];
+        if (!file) {
+            cookieUploadStatus.textContent = '❌ Selecione um arquivo (.txt ou .json) primeiro.';
+            cookieUploadStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        uploadCookiesBtn.textContent = 'Enviando...';
+        uploadCookiesBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const resp = await fetch(window.location.origin + '/api/upload_cookies', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                cookieUploadStatus.textContent = '✅ ' + data.message;
+                cookieUploadStatus.style.color = 'var(--success)';
+                cookieFileInput.value = ''; // limpa o input
+            } else {
+                cookieUploadStatus.textContent = '❌ ' + (data.detail || 'Erro ao enviar');
+                cookieUploadStatus.style.color = 'var(--danger)';
+            }
+        } catch (e) {
+            cookieUploadStatus.textContent = '❌ Erro de conexão com o servidor';
+            cookieUploadStatus.style.color = 'var(--danger)';
+        } finally {
+            uploadCookiesBtn.textContent = '📤 Enviar Cookies';
+            uploadCookiesBtn.disabled = false;
         }
     });
 

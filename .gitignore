@@ -29,3 +29,5 @@ Thumbs.db
 *.njsproj
 *.sln
 *.swp
+cookies/
+*.txt

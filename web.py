@@ -5,7 +5,7 @@ from typing import Literal, Dict, Any, Optional
 from pydantic import BaseModel
 import httpx
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -171,6 +171,24 @@ async def api_summarize(request: SummarizeRequest, username: str = Depends(verif
 @app.get("/api/version")
 def get_version():
     return {"version": VERSION}
+
+@app.post("/api/upload_cookies")
+async def upload_cookies(file: UploadFile = File(...), username: str = Depends(verify_credentials)):
+    if not file.filename.endswith(".txt") and not file.filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser .txt ou .json")
+    
+    data_dir = os.getenv("DATA_DIR", "/app/data")
+    os.makedirs(data_dir, exist_ok=True)
+    cookie_path = os.path.join(data_dir, "cookies.txt")
+    
+    try:
+        content = await file.read()
+        with open(cookie_path, "wb") as f:
+            f.write(content)
+        return {"status": "success", "message": "Cookies atualizados com sucesso"}
+    except Exception as e:
+        logging.exception("Erro ao salvar cookies.")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Serve the static files under /static but also route the root to index.html
 import os
