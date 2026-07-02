@@ -651,11 +651,11 @@ header h1 span {
 .app-version-badge {
     font-size: 0.72rem;
     font-weight: 500;
-    color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.04);
-    padding: 2px 7px;
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 8px;
     border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     vertical-align: middle;
     margin-left: 10px;
     font-family: 'Fira Code', monospace;

@@ -11,7 +11,7 @@ from extractor import extract_social_content
 
 load_dotenv()
 
-VERSION = "1.5.0 (737eb51)"
+VERSION = "1.5.1"
 
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_API_URL = os.getenv(
