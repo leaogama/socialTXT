@@ -30,8 +30,8 @@ services:
       - ENABLE_VNC_BROWSER=${ENABLE_VNC_BROWSER:-false}
     volumes:
       - socialtxt_data:/app/data
-      # Volume compartilhado com o VNC Chrome (Somente Leitura para não corromper o SQLite)
-      - youtube_chrome_profile:/app/vnc-profile:ro
+      # Volume compartilhado com o VNC Chrome
+      - youtube_chrome_profile:/app/vnc-profile
   # Serviço VNC Chrome para Login Visual na VPS
   browser-login:
     image: selenium/standalone-chrome:latest

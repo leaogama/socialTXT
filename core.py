@@ -15,6 +15,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Workaround para conflito de UID/GID do Docker em Volumes Compartilhados (VNC)
+# Concede permissão total (777) na pasta compartilhada para que o container VNC possa salvar os cookies
+if os.path.exists("/app/vnc-profile"):
+    try:
+        os.system("chmod -R 777 /app/vnc-profile 2>/dev/null")
+    except Exception:
+        pass
+
 # Define a versão baseada no horário de inicialização do app (UTC-3 / Horário de Brasília)
 brasilia_tz = datetime.timezone(datetime.timedelta(hours=-3))
 VERSION = datetime.datetime.now(brasilia_tz).strftime("%y%m%d-%H%M")
