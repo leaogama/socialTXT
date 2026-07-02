@@ -91,6 +91,24 @@ Isso **não resolve o bloqueio por reputação do IP da VPS**, mas resolve erros
 
 ---
 
+## 🖥️ Modo Login Visual na VPS (VNC Chrome)
+
+Se o bloqueio de consentimento ou CAPTCHAs for muito agressivo, você pode usar um contêiner auxiliar com um **Chrome Visual** acessível remotamente. Ao fazer login nele, o perfil é salvo em um volume compartilhado (`youtube_chrome_profile`) que o SocialTXT lê para extrair os cookies usando o `yt-dlp`.
+
+### Como ativar e usar
+1.  No `docker-compose.yml`, descomente o bloco do serviço `browser-login` (na parte inferior do arquivo).
+2.  Configure a variável `ENABLE_VNC_BROWSER=true` (no `.env` ou Portainer).
+3.  Faça o *deploy/up* dos contêineres.
+4.  Crie um túnel SSH seguro da sua máquina para a VPS (não exponha a porta 7900 publicamente!):
+    `ssh -L 7900:127.0.0.1:7900 root@IP_DA_SUA_VPS`
+5.  No seu navegador local, acesse: `http://127.0.0.1:7900/?password=socialtxt` (substitua a senha se tiver mudado).
+6.  Faça login manualmente no YouTube no navegador que aparecerá na tela virtual da VPS.
+7.  **CRÍTICO:** Pare o contêiner `browser-login` (ou feche totalmente o Chrome lá dentro) após o login. Se o navegador visual ficar aberto, o arquivo de banco de dados do Chrome (SQLite) fica "trancado" e o SocialTXT não conseguirá extrair os cookies.
+
+> 💡 O status de compartilhamento do perfil VNC pode ser acompanhado na interface web (⚙️ Configurações > 🍪 Proteção Anti-Bot).
+
+---
+
 ## 🔌 Integração & API
 
 ### 1. Chamada HTTP REST

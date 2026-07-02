@@ -32,11 +32,25 @@ def get_proxy_config() -> dict:
 # --- Configuração de Browser Profile Persistente ---
 USE_BROWSER_PROFILE = os.getenv("USE_BROWSER_PROFILE", "false").lower() == "true"
 BROWSER_PROFILE_PATH = os.getenv("BROWSER_PROFILE_PATH", "/app/data/browser-profile")
+ENABLE_VNC_BROWSER = os.getenv("ENABLE_VNC_BROWSER", "false").lower() == "true"
 
 def get_browser_profile_status() -> dict:
     """Verifica o status do profile de navegador e sessão do YouTube."""
+    import datetime
+    
+    if ENABLE_VNC_BROWSER:
+        exists = os.path.exists("/app/vnc-profile")
+        return {
+            "vnc_mode": True,
+            "enabled": True,
+            "profile_path": "/app/vnc-profile",
+            "profile_exists": exists,
+            "youtube_session": {"detected": exists, "cookie_count": 0, "last_check": datetime.datetime.now().isoformat() if exists else ""}
+        }
+        
     if not USE_BROWSER_PROFILE:
         return {
+            "vnc_mode": False,
             "enabled": False,
             "profile_path": BROWSER_PROFILE_PATH,
             "profile_exists": False,
@@ -65,9 +79,9 @@ def get_browser_profile_status() -> dict:
         except Exception as e:
             logging.error(f"Erro ao verificar sessão do youtube: {e}")
             
-    import datetime
     now = datetime.datetime.now().isoformat()
     return {
+        "vnc_mode": False,
         "enabled": True,
         "profile_path": BROWSER_PROFILE_PATH,
         "profile_exists": exists,
@@ -350,7 +364,10 @@ def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list, u
         logs.append("⚠ yt-dlp sem proxy configurado. Download pode falhar com 403 em IPs de datacenter.")
     
     cookie_temp_path = None
-    if use_browser_cookies and USE_BROWSER_PROFILE:
+    if ENABLE_VNC_BROWSER:
+        ydl_opts['cookiesfrombrowser'] = ('chrome', '/app/vnc-profile', None, None)
+        logs.append(f"Injetando cookies diretamente do perfil VNC Chrome compartilhado.")
+    elif use_browser_cookies and USE_BROWSER_PROFILE:
         cookie_temp_path = export_cookies_from_profile(logs)
         if cookie_temp_path:
             ydl_opts['cookiefile'] = cookie_temp_path

@@ -196,6 +196,7 @@ def get_browser_profile_status_api(username: str = Depends(verify_credentials)):
         return get_browser_profile_status()
     except Exception as e:
         return {
+            "vnc_mode": False,
             "enabled": False,
             "profile_path": "",
             "profile_exists": False,

@@ -832,35 +832,67 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadBrowserProfileStatus() {
         const icon = document.getElementById('profile-status-icon');
         const text = document.getElementById('profile-status-text');
-        if (!icon || !text) return;
+        const vncIcon = document.getElementById('vnc-status-icon');
+        const vncText = document.getElementById('vnc-status-text');
 
         fetch(window.location.origin + '/api/browser_profile_status')
             .then(res => res.json())
             .then(data => {
-                if (data.enabled) {
-                    if (data.youtube_session.detected) {
-                        icon.textContent = '✅';
-                        text.textContent = `Ativo (Sessão OK: ${data.youtube_session.cookie_count} cookies)`;
-                        text.style.color = 'var(--success, #4ade80)';
-                    } else if (data.profile_exists) {
-                        icon.textContent = '⚠️';
-                        text.textContent = 'Ativo (Sem sessão detectada)';
-                        text.style.color = 'var(--warning, #fbbf24)';
+                if (icon && text) {
+                    if (data.enabled && !data.vnc_mode) {
+                        if (data.youtube_session.detected) {
+                            icon.textContent = '✅';
+                            text.textContent = `Ativo (Sessão OK: ${data.youtube_session.cookie_count} cookies)`;
+                            text.style.color = 'var(--success, #4ade80)';
+                        } else if (data.profile_exists) {
+                            icon.textContent = '⚠️';
+                            text.textContent = 'Ativo (Sem sessão detectada)';
+                            text.style.color = 'var(--warning, #fbbf24)';
+                        } else {
+                            icon.textContent = '⏳';
+                            text.textContent = 'Ativo (Aguardando primeira execução)';
+                            text.style.color = 'var(--text-muted)';
+                        }
+                    } else if (data.vnc_mode) {
+                        icon.textContent = '💤';
+                        text.textContent = 'Sobrescrito pelo Login Visual (VNC)';
+                        text.style.color = 'var(--text-muted)';
                     } else {
-                        icon.textContent = '⏳';
-                        text.textContent = 'Ativo (Aguardando primeira execução)';
+                        icon.textContent = '❌';
+                        text.textContent = 'Desativado';
                         text.style.color = 'var(--text-muted)';
                     }
-                } else {
-                    icon.textContent = '❌';
-                    text.textContent = 'Desativado';
-                    text.style.color = 'var(--text-muted)';
+                }
+                
+                if (vncIcon && vncText) {
+                    if (data.vnc_mode) {
+                        if (data.profile_exists) {
+                            vncIcon.textContent = '✅';
+                            vncText.textContent = 'Ativo (Perfil compartilhado detectado)';
+                            vncText.style.color = 'var(--success, #4ade80)';
+                        } else {
+                            vncIcon.textContent = '⚠️';
+                            vncText.textContent = 'Ativo (Aguardando primeiro uso no VNC)';
+                            vncText.style.color = 'var(--warning, #fbbf24)';
+                        }
+                    } else {
+                        vncIcon.textContent = '❌';
+                        vncText.textContent = 'Desativado';
+                        vncText.style.color = 'var(--text-muted)';
+                    }
                 }
             })
             .catch(() => {
-                icon.textContent = '❓';
-                text.textContent = 'Indisponível';
-                text.style.color = 'var(--text-muted)';
+                if (icon && text) {
+                    icon.textContent = '❓';
+                    text.textContent = 'Indisponível';
+                    text.style.color = 'var(--text-muted)';
+                }
+                if (vncIcon && vncText) {
+                    vncIcon.textContent = '❓';
+                    vncText.textContent = 'Indisponível';
+                    vncText.style.color = 'var(--text-muted)';
+                }
             });
     }
 

@@ -26,10 +26,28 @@ services:
       # Opção de fallback: usar perfil persistente do navegador para manter cookies
       - USE_BROWSER_PROFILE=${USE_BROWSER_PROFILE:-false}
       - BROWSER_PROFILE_PATH=${BROWSER_PROFILE_PATH:-/app/data/browser-profile}
+      # Modo Login Visual na VPS (VNC)
+      - ENABLE_VNC_BROWSER=${ENABLE_VNC_BROWSER:-false}
     volumes:
       - socialtxt_data:/app/data
+      # Volume compartilhado com o VNC Chrome (Somente Leitura para não corromper o SQLite)
+      - youtube_chrome_profile:/app/vnc-profile:ro
       # Caso precise de cookies para o Instagram, descomente abaixo:
       # - ./cookies.txt:/app/cookies.txt:ro
 
+  # Para ativar o modo VNC, remova o comentário abaixo ou rode: docker compose --profile vnc up -d
+  # browser-login:
+  #   image: selenium/standalone-chrome:latest
+  #   container_name: socialtxt-browser-login
+  #   restart: unless-stopped
+  #   shm_size: "2g"
+  #   ports:
+  #     - "127.0.0.1:7900:7900"
+  #   environment:
+  #     - SE_VNC_PASSWORD=socialtxt
+  #   volumes:
+  #     - youtube_chrome_profile:/home/seluser/.config/google-chrome
+
 volumes:
   socialtxt_data:
+  youtube_chrome_profile:
