@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadAppVersion() {
         const badge = document.getElementById('app-version-badge');
         if (!badge) return;
-        fetch('/api/version')
+        fetch(window.location.origin + '/api/version')
             .then(res => res.json())
             .then(data => {
                 if (data.version) {
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadSettings = async () => {
         // Tentar carregar credenciais do backend primeiro
         try {
-            const resp = await fetch('/api/settings');
+            const resp = await fetch(window.location.origin + '/api/settings');
             if (resp.ok) {
                 const settings = await resp.json();
                 if (settings.api_key) apiKeyInput.value = settings.api_key;
@@ -533,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Salvar persistentemente no backend
         try {
-            const resp = await fetch('/api/settings', {
+            const resp = await fetch(window.location.origin + '/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultSection.classList.add('hidden');
 
         try {
-            const resp = await fetch('/api/summarize', {
+            const resp = await fetch(window.location.origin + '/api/summarize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
