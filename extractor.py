@@ -339,7 +339,7 @@ def try_youtube_transcript_api(url: str, logs: list) -> str:
 def download_media_and_metadata_yt_dlp(url: str, output_base: str, logs: list, use_browser_cookies: bool = False) -> tuple[bool, str]:
     # Baixa apenas áudio e tenta extrair a legenda (descrição)
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio/worst',
         'outtmpl': f'{output_base}.%(ext)s',
         'extractor_args': {
             'youtube': {
