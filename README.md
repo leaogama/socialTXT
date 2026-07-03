@@ -124,12 +124,34 @@ curl -X POST "http://localhost:8001/api/summarize" \
      }'
 ```
 
-### 2. Servidor MCP (Integração Local via API Remota)
-Você pode usar a inteligência do SocialTXT diretamente no **OpenCode**, **Claude Desktop** ou **Cursor** no seu computador local, enquanto a extração pesada (VNC, Download e Whisper) roda remotamente na sua VPS!
+### MCP para OpenCode
 
-Para isso, o projeto acompanha o script local `mcp_server_basic.py` que atua como uma **ponte** entre o seu computador e a sua VPS.
+Use o MCP para transformar o SocialTXT da VPS em uma ferramenta nativa do seu OpenCode local.
 
-No **OpenCode** (`opencode.json`), basta apontar para o script Python local:
+O OpenCode roda no seu computador, mas o processamento continua acontecendo na VPS. O MCP local funciona como uma ponte: ele recebe o pedido do OpenCode, chama a API REST do SocialTXT e devolve o resumo pronto.
+
+Isso permite que o OpenCode use o SocialTXT para resumir vídeos do YouTube, Shorts e outros conteúdos suportados, sem baixar vídeos no seu PC e sem depender de navegador, cookies ou proxy locais.
+
+**Fluxo:**
+
+```text
+OpenCode local
+  ↓
+MCP SocialTXT local
+  ↓
+API SocialTXT na VPS
+  ↓
+Resumo pronto
+```
+
+**Exemplo de pedido no OpenCode:**
+
+```text
+Use o MCP socialtxt para resumir este vídeo em português curto:
+https://youtube.com/shorts/EXEMPLO
+```
+
+**Configuração do Cliente (opencode.json):**
 
 ```json
 {
@@ -144,7 +166,7 @@ No **OpenCode** (`opencode.json`), basta apontar para o script Python local:
 }
 ```
 
-*Como funciona:* O OpenCode descobre a ferramenta localmente, mas quando solicitado para resumir um link, o script `mcp_server_basic.py` dispara a chamada para a sua VPS (Ex: `77.237.237.138:8001`) usando suas credenciais, poupando a sua máquina de todo o processamento pesado!
+> ⚠️ **Aviso de Segurança:** Na configuração básica, o arquivo MCP local (`mcp_server_basic.py`) pode conter URL, usuário e senha diretamente no código. Use isso apenas para teste local e **NÃO ENVIE** esse arquivo com a senha real para o GitHub.
 
 ---
 
