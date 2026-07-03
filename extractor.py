@@ -539,71 +539,80 @@ def process_downloaded_audio(base_path: str, description: str, logs: list) -> st
 
 def extract_social_content(url: str) -> tuple[str, list[str]]:
     debug_logs = []
-    try:
-        from core import VERSION
-        debug_logs.append(f"Versão do App: {VERSION}")
-    except Exception:
-        debug_logs.append("Versão do App: Desconhecida")
-        
-    # --- PIPELINE DO YOUTUBE (5 Níveis) ---
-    if "youtube.com" in url or "youtu.be" in url:
-        debug_logs.append("Detectada URL do YouTube. Iniciando pipeline de extração de 5 níveis...")
-        
-        # Nível 1: youtube-transcript-api
-        debug_logs.append("--- NÍVEL 1: youtube-transcript-api (Nativo) ---")
-        text = try_youtube_transcript_api(url, debug_logs)
-        if text: return f"Transcrição do YouTube: {text}", debug_logs
-            
-        temp_id = str(uuid.uuid4())
-        base_path = f"/tmp/{temp_id}"
-        
-        # Nível 2: yt-dlp sem cookies do perfil
-        debug_logs.append("--- NÍVEL 2: yt-dlp sem cookies persistentes ---")
-        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
-        if success:
-            return process_downloaded_audio(base_path, description, debug_logs), debug_logs
-            
-        # Nível 3: yt-dlp com cookies exportados do perfil persistente
-        debug_logs.append("--- NÍVEL 3: yt-dlp com cookies do perfil persistente ---")
-        if USE_BROWSER_PROFILE:
-            success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=True)
-            if success:
-                return process_downloaded_audio(base_path, description, debug_logs), debug_logs
-        else:
-            debug_logs.append("PULADO: USE_BROWSER_PROFILE está false.")
-            
-        # Nível 4: Playwright (Perfil Persistente)
-        debug_logs.append("--- NÍVEL 4: Extração via Playwright (Navegação Headless) ---")
-        text = extract_youtube_transcript_via_playwright(url, debug_logs)
-        if text: return f"Transcrição do YouTube: {text}", debug_logs
-            
-        # Nível 5: Falha
-        debug_logs.append("--- NÍVEL 5: Falha Total ---")
-        debug_logs.append("Todas as tentativas de extração do YouTube falharam.")
-        return "", debug_logs
-
-
-    # --- OUTRAS REDES (Instagram, TikTok, X) ---
     temp_id = str(uuid.uuid4())
     base_path = f"/tmp/{temp_id}"
-
-    success = False
-    description = ""
-
-    # Instagram: tenta Playwright primeiro (navegador real)
-    if "instagram.com" in url:
-        debug_logs.append("Detectada URL do Instagram. Iniciando fluxo com Playwright...")
-        success, description = extract_with_playwright(url, base_path, debug_logs)
     
-    # Fallback: Baixar áudio + Descrição com yt-dlp
-    if not success:
-        debug_logs.append("Iniciando extração via download com yt-dlp + transcrição Whisper...")
-        success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
-    
-    result_text = ""
-    if success:
-        result_text = process_downloaded_audio(base_path, description, debug_logs)
-    elif description:
-        result_text = f"Legenda/Descrição original:\n{description}\n\n"
+    try:
+        try:
+            from core import VERSION
+            debug_logs.append(f"Versão do App: {VERSION}")
+        except Exception:
+            debug_logs.append("Versão do App: Desconhecida")
+            
+        # --- PIPELINE DO YOUTUBE (5 Níveis) ---
+        if "youtube.com" in url or "youtu.be" in url:
+            debug_logs.append("Detectada URL do YouTube. Iniciando pipeline de extração de 5 níveis...")
+            
+            # Nível 1: youtube-transcript-api
+            debug_logs.append("--- NÍVEL 1: youtube-transcript-api (Nativo) ---")
+            text = try_youtube_transcript_api(url, debug_logs)
+            if text: return f"Transcrição do YouTube: {text}", debug_logs
+                
+            # Nível 2: yt-dlp sem cookies do perfil
+            debug_logs.append("--- NÍVEL 2: yt-dlp sem cookies persistentes ---")
+            success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
+            if success:
+                return process_downloaded_audio(base_path, description, debug_logs), debug_logs
+                
+            # Nível 3: yt-dlp com cookies exportados do perfil persistente
+            debug_logs.append("--- NÍVEL 3: yt-dlp com cookies do perfil persistente ---")
+            if USE_BROWSER_PROFILE:
+                success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=True)
+                if success:
+                    return process_downloaded_audio(base_path, description, debug_logs), debug_logs
+            else:
+                debug_logs.append("PULADO: USE_BROWSER_PROFILE está false.")
+                
+            # Nível 4: Playwright (Perfil Persistente)
+            debug_logs.append("--- NÍVEL 4: Extração via Playwright (Navegação Headless) ---")
+            text = extract_youtube_transcript_via_playwright(url, debug_logs)
+            if text: return f"Transcrição do YouTube: {text}", debug_logs
+                
+            # Nível 5: Falha
+            debug_logs.append("--- NÍVEL 5: Falha Total ---")
+            debug_logs.append("Todas as tentativas de extração do YouTube falharam.")
+            return "", debug_logs
 
-    return result_text.strip(), debug_logs
+
+        # --- OUTRAS REDES (Instagram, TikTok, X) ---
+        success = False
+        description = ""
+
+        # Instagram: tenta Playwright primeiro (navegador real)
+        if "instagram.com" in url:
+            debug_logs.append("Detectada URL do Instagram. Iniciando fluxo com Playwright...")
+            success, description = extract_with_playwright(url, base_path, debug_logs)
+        
+        # Fallback: Baixar áudio + Descrição com yt-dlp
+        if not success:
+            debug_logs.append("Iniciando extração via download com yt-dlp + transcrição Whisper...")
+            success, description = download_media_and_metadata_yt_dlp(url, base_path, debug_logs, use_browser_cookies=False)
+        
+        result_text = ""
+        if success:
+            result_text = process_downloaded_audio(base_path, description, debug_logs)
+        elif description:
+            result_text = f"Legenda/Descrição original:\n{description}\n\n"
+
+        return result_text.strip(), debug_logs
+        
+    finally:
+        # Garante a limpeza de QUALQUER arquivo criado nesta execução específica,
+        # mesmo se ocorrer um erro fatal ou timeout no meio do processo.
+        try:
+            leftovers = glob.glob(f"{base_path}*")
+            for f in leftovers:
+                os.remove(f)
+                debug_logs.append(f"Limpeza Forçada (Finally): Arquivo removido: {f}")
+        except Exception:
+            pass
