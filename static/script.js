@@ -713,6 +713,81 @@ document.addEventListener('DOMContentLoaded', () => {
         urlInput.focus();
     });
 
+    // ===== EXPORT BUTTONS =====
+    const copyResultBtn = document.getElementById('copy-result-btn');
+    const downloadTxtBtn = document.getElementById('download-txt-btn');
+    const downloadMdBtn = document.getElementById('download-md-btn');
+
+    function getFormattedResultText(isMarkdown) {
+        const title = resultTitle.textContent;
+        const type = typeBadge.textContent;
+        const url = urlInput.value;
+        
+        let text = isMarkdown ? `# [${type}] ${title}\n\n` : `[${type}] ${title}\n\n`;
+        
+        if (!warningsContainer.classList.contains('hidden') && warningsContainer.children.length > 0) {
+            Array.from(warningsContainer.children).forEach(p => {
+                text += `${p.textContent}\n`;
+            });
+            text += '\n';
+        }
+        
+        if (!structuredResultBlock.classList.contains('hidden')) {
+            text += isMarkdown ? `### Resumo Geral\n` : `Resumo Geral:\n`;
+            text += `${summaryText.textContent}\n\n`;
+            
+            text += isMarkdown ? `### Pontos Principais\n` : `Pontos Principais:\n`;
+            Array.from(keyPointsList.children).forEach(li => {
+                text += isMarkdown ? `- ${li.textContent}\n` : `• ${li.textContent}\n`;
+            });
+        } else {
+            text += isMarkdown ? `### Resposta da IA\n` : `Resposta da IA:\n`;
+            text += `${plainTextContent.textContent}\n`;
+        }
+        
+        text += `\n---\nLink Original: ${url}`;
+        return text;
+    }
+
+    function downloadFile(filename, content) {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const fileUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(fileUrl);
+    }
+
+    if (copyResultBtn) {
+        copyResultBtn.addEventListener('click', () => {
+            const text = getFormattedResultText(false);
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = copyResultBtn.textContent;
+                copyResultBtn.textContent = '✅ Copiado!';
+                setTimeout(() => copyResultBtn.textContent = originalText, 2000);
+            }).catch(err => {
+                alert('Erro ao copiar: ' + err);
+            });
+        });
+    }
+
+    if (downloadTxtBtn) {
+        downloadTxtBtn.addEventListener('click', () => {
+            const text = getFormattedResultText(false);
+            downloadFile('Resumo_SocialTXT.txt', text);
+        });
+    }
+
+    if (downloadMdBtn) {
+        downloadMdBtn.addEventListener('click', () => {
+            const text = getFormattedResultText(true);
+            downloadFile('Resumo_SocialTXT.md', text);
+        });
+    }
+
     // ===== RENDER RESULT =====
     function renderResult(data, isJsonMode) {
         resultTitle.textContent = data.possible_title || 'Resumo do Conteúdo';
