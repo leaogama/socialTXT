@@ -124,24 +124,27 @@ curl -X POST "http://localhost:8001/api/summarize" \
      }'
 ```
 
-### 2. Servidor MCP (Model Context Protocol)
-Integre o resumo de mídias sociais diretamente no Claude Desktop ou Cursor. 
+### 2. Servidor MCP (Integração Local via API Remota)
+Você pode usar a inteligência do SocialTXT diretamente no **OpenCode**, **Claude Desktop** ou **Cursor** no seu computador local, enquanto a extração pesada (VNC, Download e Whisper) roda remotamente na sua VPS!
 
-Adicione a configuração no arquivo `claude_desktop_config.json`:
+Para isso, o projeto acompanha o script local `mcp_server_basic.py` que atua como uma **ponte** entre o seu computador e a sua VPS.
+
+No **OpenCode** (`opencode.json`), basta apontar para o script Python local:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "socialtxt": {
-      "command": "python",
-      "args": ["C:/_git/socialTXT/mcp_server.py"],
-      "env": {
-        "LLM_API_KEY": "SUA_API_KEY_AQUI"
-      }
+      "type": "local",
+      "command": ["py", "C:/_git/socialTXT/mcp_server_basic.py"],
+      "cwd": "C:/_git/socialTXT",
+      "enabled": true
     }
   }
 }
 ```
+
+*Como funciona:* O OpenCode descobre a ferramenta localmente, mas quando solicitado para resumir um link, o script `mcp_server_basic.py` dispara a chamada para a sua VPS (Ex: `77.237.237.138:8001`) usando suas credenciais, poupando a sua máquina de todo o processamento pesado!
 
 ---
 

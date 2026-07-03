@@ -275,29 +275,30 @@
                 <!-- Painel MCP -->
                 <div class="tab-content hidden" id="content-mcp">
                     <p class="api-intro">
-                        O SocialTXT implementa a especificação <strong>Model Context Protocol (MCP)</strong>. Conecte-o diretamente como uma ferramenta nativa ao Claude Desktop, Cursor ou qualquer cliente compatível.
+                        O SocialTXT implementa a especificação <strong>Model Context Protocol (MCP)</strong>. Conecte-o diretamente como uma ferramenta nativa ao OpenCode, Claude Desktop ou Cursor.
                     </p>
                     <div class="api-details">
+                        <p class="api-docs-link-text" style="color: var(--primary, #60a5fa); font-weight: 500;">
+                            💡 Dica de Arquitetura Remota: O seu OpenCode local pode enviar vídeos para a sua VPS processar! Use o arquivo <code>mcp_server_basic.py</code> no seu computador local para servir de ponte.
+                        </p>
                         <p class="api-docs-link-text">
-                            <strong>Passo 1:</strong> Adicione esta configuração ao seu arquivo de configuração MCP.<br>
-                            No Windows (Claude Desktop): <code>%APPDATA%\Claude\claude_desktop_config.json</code>
+                            <strong>Passo 1:</strong> Adicione esta configuração ao seu cliente MCP (ex: <code>opencode.json</code> no seu PC).
                         </p>
                         <div class="code-container-mcp">
                             <pre><code>{
-  "mcpServers": {
+  "mcp": {
     "socialtxt": {
-      "command": "python",
-      "args": ["C:/_git/socialTXT/mcp_server.py"],
-      "env": {
-        "LLM_API_KEY": "SUA_API_KEY_AQUI"
-      }
+      "type": "local",
+      "command": ["py", "C:/_git/socialTXT/mcp_server_basic.py"],
+      "cwd": "C:/_git/socialTXT",
+      "enabled": true
     }
   }
 }</code></pre>
                         </div>
                         <p class="api-docs-link-text" style="margin-top: 1rem;">
-                            <strong>Passo 2:</strong> Certifique-se de que a biblioteca oficial do MCP está instalada no seu Python local:<br>
-                            <code>pip install mcp</code>
+                            <strong>Passo 2:</strong> Certifique-se de preencher a URL da VPS e a senha dentro do arquivo <code>mcp_server_basic.py</code>, e instale as dependências locais:<br>
+                            <code>pip install mcp fastmcp requests</code>
                         </p>
                     </div>
                 </div>
